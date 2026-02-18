@@ -29,7 +29,61 @@ not to serve developers looking for implementation details.
 
 ---
 
+## Dependencies
+
+This skill requires two companion skills to be installed and available. Each one is
+invoked automatically during analysis:
+
+| Skill | When used | What happens without it |
+|-------|-----------|------------------------|
+| `read-arxiv-paper` | **technical.md §Research & Papers** — when the project links to arXiv/DOI papers, this skill is invoked to produce a structured paper summary instead of a bare URL | Papers are listed as plain links only; no summary or key-takeaways |
+| `translate` | **On demand** — when the user requests the report (or a section) in a language other than English | Output is English only; translation requests cannot be fulfilled |
+
+**Installation**: Skills are installed via Claude Code settings or the skill marketplace.
+If a skill is missing, the dependency check (Step 0 below) will tell the user exactly
+what to install before analysis begins.
+
+---
+
 ## Workflow
+
+### 0. Dependency check — run this FIRST, before any analysis
+
+Before cloning the repo or calling any API, check whether both required skills are
+available in the current session.
+
+**How to check**: Look at the list of available skills shown in your system context
+(the `Skill` tool description). Both `translate` and `read-arxiv-paper` must appear.
+
+**For each missing skill**, stop and tell the user:
+
+```
+⚠️  Missing dependency: the `<skill-name>` skill is not installed.
+
+This skill is needed for: <purpose from table above>.
+
+Install it with:
+  npx skills add https://github.com/sunqb/ccsdk --skill <skill-name>
+
+Once installed, restart the session and try again.
+```
+
+**Exact install commands for each dependency**:
+
+| Skill | Install command |
+|-------|----------------|
+| `read-arxiv-paper` | `npx skills add https://github.com/sunqb/ccsdk --skill read-arxiv-paper` |
+| `translate` | `npx skills add https://github.com/sunqb/ccsdk --skill translate` |
+
+**Degraded-mode exception**: If the user explicitly says "proceed anyway / 继续":
+- Missing `read-arxiv-paper` → list paper URLs in technical.md without summaries; add a note:
+  `> ⚠️ read-arxiv-paper skill not installed — paper summaries unavailable.`
+- Missing `translate` → continue in English; add a note at the top of index.md:
+  `> ⚠️ translate skill not installed — report is English only.`
+
+Do NOT silently skip the check. Always surface missing dependencies to the user.
+
+---
 
 ### 1. Clone & gather data
 
@@ -74,6 +128,19 @@ pattern: "(?i)(production|used by|powered by|built with|case study)"  path: <LOC
 pattern: "(?i)(breaking|BREAKING CHANGE|incompatible|migration)"  path: <LOCAL_REPO_PATH>/CHANGELOG.md
 ```
 
+#### 📄 Invoke `read-arxiv-paper` for referenced papers
+
+When the script output lists paper/DOI links (in the "Paper/DOI links found in README"
+or CITATION.cff section), and the link points to an arXiv paper:
+
+1. Check if a summary already exists in `./knowledge/summary_*.md` — read it if so.
+2. If no local summary exists, invoke the `read-arxiv-paper` skill with the arXiv URL.
+   The skill downloads the TeX source and writes a summary to `./knowledge/summary_<tag>.md`.
+3. Reference the summary when writing `technical.md §Research & Papers`.
+
+Only invoke this skill for arXiv links. For non-arXiv paper links (ACL Anthology, NeurIPS
+proceedings, etc.), include the URL and title in technical.md but do not attempt a deep read.
+
 ### 3. Clean up temp directory
 
 After analysis is complete, remove the temp directory:
@@ -108,13 +175,33 @@ all 7 files. Every section contributes to a complete decision-maker picture.
 Do NOT output the full analysis as a chat message. Instead, write it as a set of structured
 markdown files so the user can navigate and reference them easily.
 
-#### Report directory
+#### Report directory structure
+
+Every report lives under a project directory split into two language subdirectories:
 
 ```
 ./reports/{owner}-{reponame}/
+├── en/          ← English originals (written first)
+│   ├── index.md
+│   ├── background.md
+│   ├── adoption.md
+│   ├── competitive.md
+│   ├── momentum.md
+│   ├── risk.md
+│   └── technical.md
+└── zh/          ← Chinese translations (written second, via translate skill)
+    ├── index.md
+    ├── background.md
+    ├── adoption.md
+    ├── competitive.md
+    ├── momentum.md
+    ├── risk.md
+    └── technical.md
 ```
 
-Example: analyzing `vllm-project/llm-compressor` → `./reports/vllm-project-llm-compressor/`
+Example: analyzing `vllm-project/llm-compressor` →
+- English: `./reports/vllm-project-llm-compressor/en/`
+- Chinese: `./reports/vllm-project-llm-compressor/zh/`
 
 #### File layout and content responsibilities
 
@@ -128,15 +215,14 @@ Example: analyzing `vllm-project/llm-compressor` → `./reports/vllm-project-llm
 | `risk.md` | Bus factor, security, breaking-change history, abandonment signals, license |
 | `technical.md` | Core concepts · Architecture · Key components · Papers · Docs links · Hello World · Code quality |
 
-#### Writing order
+#### Step 5a — Write English report (`en/`)
 
-Write the **6 dimension files first** (background → adoption → competitive → momentum → risk →
-technical), then write `index.md` last — because the index summarizes all of them.
+Write all 7 files to the `en/` subdirectory. Order: **6 dimension files first**
+(background → adoption → competitive → momentum → risk → technical), then `index.md` last.
 
-Use the **Write** tool for every file. Create the directory automatically (Write creates
-parent directories).
+Use the **Write** tool for every file. Parent directories are created automatically.
 
-#### index.md structure
+`index.md` structure:
 
 ```markdown
 # {Project Name} — Analysis Report
@@ -166,12 +252,70 @@ parent directories).
 | Technical Details | [one sentence] | [technical.md](./technical.md) |
 ```
 
+#### Step 5b — Translate to Chinese (`zh/`) via `translate` skill
+
+After all 7 English files are written, **always** invoke the `translate` skill to produce
+the Chinese version. This is not optional — both language versions are always generated.
+
+**For each of the 7 files**, in the same order (background → adoption → competitive →
+momentum → risk → technical → index):
+
+1. Read the English file from `en/<file>.md`.
+2. Invoke the `translate` skill with the following parameters:
+   - `target_language`: `zh`
+   - `translation_style`: `professional`
+   - `retain_format`: `true`  ← preserve all markdown structure, headings, tables, links
+   - `auto_humanize`: `true`  ← remove AI-sounding phrasing after translation
+3. Write the translated content to `zh/<file>.md` using the **Write** tool.
+
+Translation rules:
+- All prose and table cell content → translate to Chinese
+- Headings → translate to Chinese
+- Technical terms, algorithm names (GPTQ, AWQ, FP8…), project/company names, code blocks,
+  URLs, CLI commands → keep in original English, do NOT translate
+
+#### Step 5c — Write bilingual `introduction.md`
+
+After both `en/` and `zh/` are complete, write a single bilingual entry-point file at the
+**project root** (same level as `en/` and `zh/`):
+
+```
+./reports/{owner}-{reponame}/introduction.md
+```
+
+This file serves as the landing page for the whole report. Write it with the Write tool.
+
+**Structure**:
+
+```markdown
+# {Project Name} — Analysis Report
+
+> {one-sentence verdict in English, drawn from index.md Decision Brief}
+
+📖 [Read in English](./en/index.md)
+
+---
+
+# {Project Name} — 分析报告
+
+> {上面英文摘要的中文翻译，一句话}
+
+📖 [阅读中文版](./zh/index.md)
+```
+
+The one-sentence verdict must be derived from the Decision Brief already written in
+`en/index.md` — summarise the Adopt/Evaluate/Avoid verdict and the key reason in plain
+language. The Chinese sentence is the translation of that verdict (apply `auto_humanize`
+as well).
+
 #### After writing all files
 
 Tell the user:
 ```
-Report written to ./reports/{owner}-{reponame}/
-Open ./reports/{owner}-{reponame}/index.md to start reading.
+报告已生成：
+  入口：  ./reports/{owner}-{reponame}/introduction.md
+  英文版：./reports/{owner}-{reponame}/en/index.md
+  中文版：./reports/{owner}-{reponame}/zh/index.md
 ```
 
 Do NOT repeat the full report content in the chat. A brief summary (3-5 sentences) is fine.
@@ -188,8 +332,29 @@ Do NOT repeat the full report content in the chat. A brief summary (3-5 sentence
 - **Changelog tells the truth**: The CHANGELOG reveals breaking-change frequency and versioning
   discipline better than any other single file.
 - **Bus factor matters**: If the top 1-2 contributors own >70% of commits, flag it explicitly.
-- **No gh CLI**: The script falls back to `curl https://api.github.com/repos/<owner>/<repo>`
-  for public repo metadata. Package registry APIs (PyPI, npm) require no authentication.
+- **GitHub Token (recommended)**: The script supports a personal access token to avoid
+  the 60 req/hr unauthenticated rate limit. Token priority order:
+  1. `~/.config/github-analyzer/config` file (primary — see setup below)
+  2. `GITHUB_TOKEN` environment variable
+  3. `gh` CLI (if authenticated)
+  4. Unauthenticated curl (60 req/hr limit — warns user)
+
+  **Setup** (tell users this if they hit rate limits or want authenticated access):
+  ```bash
+  mkdir -p ~/.config/github-analyzer
+  cat > ~/.config/github-analyzer/config <<'EOF'
+  # GitHub Personal Access Token
+  # Get one at: https://github.com/settings/tokens
+  # No scopes needed for public repos; add 'repo' for private repos.
+  GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+  EOF
+  chmod 600 ~/.config/github-analyzer/config
+  ```
+  The script validates the token on every run. If the token is expired or
+  revoked, it prints a clear error box and falls back to unauthenticated.
+- **No token / no gh CLI**: Falls back to unauthenticated `curl`. Works fine for
+  occasional use; hits rate limits on rapid repeated analysis. Package registry
+  APIs (PyPI, npm) require no authentication regardless.
 - **Large repos**: The script uses `--depth=1` (shallow clone) for speed.
 - **Trending**: For trending repos, no local clone needed — use the GitHub search API directly.
   Default to "all languages, past 7 days" if not specified.

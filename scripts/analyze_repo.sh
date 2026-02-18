@@ -2,6 +2,9 @@
 # GitHub Project Analyzer Script
 # Usage: ./analyze_repo.sh <github-url-or-owner/repo>
 # Requires: git, jq, curl; optionally: gh CLI (authenticated)
+#
+# Token config file: ~/.config/github-analyzer/config
+# Format:  GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 
 set -e
 
@@ -22,15 +25,198 @@ echo "=== GitHub Project Analyzer: $REPO ==="
 echo ""
 
 # ---------------------------------------------------------------
-# Helper: gh or curl fallback
+# Auth: load config file, validate token, set AUTH_METHOD
 # ---------------------------------------------------------------
-gh_or_curl() {
+
+# Config file locations (checked in order):
+#   1. ~/.config/github-analyzer/config   (primary, user-level)
+#   2. <script-dir>/../config             (project-local fallback)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_PRIMARY="${HOME}/.config/github-analyzer/config"
+CONFIG_LOCAL="${SCRIPT_DIR}/../config"
+
+# Load GITHUB_TOKEN from config file (if not already set in environment)
+_load_config() {
+  local cfg="$1"
+  [ -f "$cfg" ] || return 1
+  while IFS= read -r line; do
+    # Strip leading whitespace and skip comments/empty lines
+    line="${line#"${line%%[! ]*}"}"
+    [[ "$line" =~ ^# ]] && continue
+    [[ -z "$line" ]] && continue
+    local key="${line%%=*}"
+    local val="${line#*=}"
+    # Strip surrounding quotes from value
+    val="${val#\"}" ; val="${val%\"}"
+    val="${val#\'}" ; val="${val%\'}"
+    case "$key" in
+      GITHUB_TOKEN) [ -z "$GITHUB_TOKEN" ] && GITHUB_TOKEN="$val" ;;
+    esac
+  done < "$cfg"
+}
+
+: "${GITHUB_TOKEN:=}"   # initialise to empty if unset
+
+_load_config "$CONFIG_PRIMARY"
+_load_config "$CONFIG_LOCAL"
+
+# Validate the token with a lightweight API call; set AUTH_METHOD accordingly
+AUTH_METHOD=""
+TOKEN_VALID=false
+
+_check_token() {
+  local token="$1"
+  local tmp
+  tmp=$(mktemp)
+  local http_code
+  http_code=$(curl -s -o "$tmp" -w "%{http_code}" \
+    "https://api.github.com/user" \
+    -H "Authorization: Bearer $token" \
+    -H "Accept: application/vnd.github+json" 2>/dev/null)
+  rm -f "$tmp"
+  echo "$http_code"
+}
+
+echo "### Auth Status"
+if [ -n "$GITHUB_TOKEN" ]; then
+  echo -n "  Token found (source: config/env) — validating ... "
+  HTTP_CODE=$(_check_token "$GITHUB_TOKEN")
+  case "$HTTP_CODE" in
+    200)
+      echo "✓ valid"
+      TOKEN_VALID=true
+      AUTH_METHOD="token"
+      ;;
+    401)
+      echo "✗ INVALID"
+      echo ""
+      echo "  ╔══════════════════════════════════════════════════════════════╗"
+      echo "  ║  ⚠️  GITHUB TOKEN ERROR: Token is invalid or expired (401)  ║"
+      echo "  ║                                                              ║"
+      echo "  ║  To fix: update GITHUB_TOKEN in your config file:           ║"
+      echo "  ║    ${CONFIG_PRIMARY}"
+      echo "  ║                                                              ║"
+      echo "  ║  Get a new token at:                                         ║"
+      echo "  ║    https://github.com/settings/tokens                        ║"
+      echo "  ║                                                              ║"
+      echo "  ║  Falling back to unauthenticated (60 req/hr limit).          ║"
+      echo "  ╚══════════════════════════════════════════════════════════════╝"
+      echo ""
+      GITHUB_TOKEN=""
+      AUTH_METHOD="unauthenticated"
+      ;;
+    403)
+      echo "✗ FORBIDDEN"
+      echo ""
+      echo "  ╔══════════════════════════════════════════════════════════════╗"
+      echo "  ║  ⚠️  GITHUB TOKEN ERROR: Token is forbidden (403)           ║"
+      echo "  ║                                                              ║"
+      echo "  ║  Your token lacks required permissions.                      ║"
+      echo "  ║  For public repos: no scope needed (try a fine-grained       ║"
+      echo "  ║  token with 'Public Repositories' read access).              ║"
+      echo "  ║  For private repos: add 'repo' scope.                        ║"
+      echo "  ║                                                              ║"
+      echo "  ║  Regenerate at: https://github.com/settings/tokens           ║"
+      echo "  ║  Falling back to unauthenticated (60 req/hr limit).          ║"
+      echo "  ╚══════════════════════════════════════════════════════════════╝"
+      echo ""
+      GITHUB_TOKEN=""
+      AUTH_METHOD="unauthenticated"
+      ;;
+    *)
+      echo "✗ unexpected response (HTTP $HTTP_CODE)"
+      echo "  Falling back to unauthenticated mode."
+      GITHUB_TOKEN=""
+      AUTH_METHOD="unauthenticated"
+      ;;
+  esac
+elif command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+  echo "  No config token — using gh CLI (authenticated)"
+  AUTH_METHOD="gh"
+else
+  echo "  No token configured and gh CLI not authenticated."
+  echo ""
+  echo "  ╔══════════════════════════════════════════════════════════════╗"
+  echo "  ║  ℹ️  Running unauthenticated (60 API requests/hour limit)   ║"
+  echo "  ║                                                              ║"
+  echo "  ║  To avoid rate limits, add a GitHub token:                  ║"
+  echo "  ║    mkdir -p ~/.config/github-analyzer                        ║"
+  echo "  ║    echo 'GITHUB_TOKEN=ghp_xxx' > ~/.config/github-analyzer/config  ║"
+  echo "  ║                                                              ║"
+  echo "  ║  Get a token (no scopes needed for public repos):            ║"
+  echo "  ║    https://github.com/settings/tokens                        ║"
+  echo "  ╚══════════════════════════════════════════════════════════════╝"
+  echo ""
+  AUTH_METHOD="unauthenticated"
+fi
+echo ""
+
+# ---------------------------------------------------------------
+# Helper: call GitHub API with correct auth method
+# ---------------------------------------------------------------
+github_api() {
   local endpoint="$1"
-  if command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+  local tmp body http_code
+
+  if [ "$AUTH_METHOD" = "token" ]; then
+    tmp=$(mktemp)
+    http_code=$(curl -s -o "$tmp" -w "%{http_code}" \
+      "https://api.github.com/$endpoint" \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      -H "Accept: application/vnd.github+json" 2>/dev/null)
+    body=$(cat "$tmp")
+    rm -f "$tmp"
+
+    case "$http_code" in
+      200|201|204)
+        echo "$body"
+        ;;
+      401)
+        echo "" >&2
+        echo "  ⚠️  Token auth failed mid-run (401). Token may have been revoked." >&2
+        echo "     Update: ${CONFIG_PRIMARY}" >&2
+        echo "" >&2
+        return 1
+        ;;
+      403)
+        echo "" >&2
+        echo "  ⚠️  Token forbidden for this endpoint (403): $endpoint" >&2
+        echo "" >&2
+        return 1
+        ;;
+      404)
+        # Repo not found or private — not a token error
+        echo "$body"
+        ;;
+      *)
+        echo "" >&2
+        echo "  ⚠️  GitHub API returned HTTP $http_code for: $endpoint" >&2
+        return 1
+        ;;
+    esac
+
+  elif [ "$AUTH_METHOD" = "gh" ]; then
     gh api "$endpoint" 2>/dev/null
+
   else
-    curl -sf "https://api.github.com/$endpoint" \
-      -H "Accept: application/vnd.github+json" 2>/dev/null
+    # Unauthenticated
+    tmp=$(mktemp)
+    http_code=$(curl -s -o "$tmp" -w "%{http_code}" \
+      "https://api.github.com/$endpoint" \
+      -H "Accept: application/vnd.github+json" 2>/dev/null)
+    body=$(cat "$tmp")
+    rm -f "$tmp"
+
+    if [ "$http_code" = "403" ]; then
+      echo "" >&2
+      echo "  ⚠️  GitHub API rate limit hit (unauthenticated, 60 req/hr)." >&2
+      echo "     Add a token to avoid this:" >&2
+      echo "       mkdir -p ~/.config/github-analyzer" >&2
+      echo "       echo 'GITHUB_TOKEN=ghp_xxx' > ~/.config/github-analyzer/config" >&2
+      echo "" >&2
+      return 1
+    fi
+    echo "$body"
   fi
 }
 
@@ -57,7 +243,7 @@ echo ""
 # ---------------------------------------------------------------
 
 echo "### Repository Info (GitHub API)"
-REPO_JSON=$(gh_or_curl "repos/$REPO" || echo "{}")
+REPO_JSON=$(github_api "repos/$REPO" || echo "{}")
 echo "$REPO_JSON" | jq '{
   name: .name,
   description: .description,
@@ -88,7 +274,7 @@ echo ""
 # ---------------------------------------------------------------
 
 echo "### Organization / Owner Info"
-ORG_JSON=$(gh_or_curl "orgs/$OWNER" 2>/dev/null || gh_or_curl "users/$OWNER" 2>/dev/null || echo "{}")
+ORG_JSON=$(github_api "orgs/$OWNER" 2>/dev/null || github_api "users/$OWNER" 2>/dev/null || echo "{}")
 echo "$ORG_JSON" | jq '{
   name: .name,
   blog: .blog,
@@ -118,7 +304,7 @@ echo ""
 # ---------------------------------------------------------------
 
 echo "### Top Contributors (up to 15)"
-CONTRIB_JSON=$(gh_or_curl "repos/$REPO/contributors?per_page=15" || echo "[]")
+CONTRIB_JSON=$(github_api "repos/$REPO/contributors?per_page=15" || echo "[]")
 echo "$CONTRIB_JSON" | jq '[.[] | {login: .login, contributions: .contributions}]' 2>/dev/null \
   || echo "(unavailable)"
 
@@ -147,13 +333,13 @@ echo ""
 # ---------------------------------------------------------------
 
 echo "### Recent Releases (up to 8)"
-gh_or_curl "repos/$REPO/releases?per_page=8" \
+github_api "repos/$REPO/releases?per_page=8" \
   | jq '[.[] | {tag: .tag_name, name: .name, published: .published_at, prerelease: .prerelease}]' \
   2>/dev/null || echo "(no releases)"
 echo ""
 
 echo "### Open Pull Requests — count and oldest unreviewed"
-PR_JSON=$(gh_or_curl "repos/$REPO/pulls?state=open&per_page=100" || echo "[]")
+PR_JSON=$(github_api "repos/$REPO/pulls?state=open&per_page=100" || echo "[]")
 echo "$PR_JSON" | jq '
   {
     open_pr_count: length,
@@ -164,7 +350,7 @@ echo "$PR_JSON" | jq '
 echo ""
 
 echo "### Recent Closed Issues (response time sample)"
-gh_or_curl "repos/$REPO/issues?state=closed&per_page=5&sort=updated" \
+github_api "repos/$REPO/issues?state=closed&per_page=5&sort=updated" \
   | jq '[.[] | {number: .number, title: .title, created: .created_at, closed: .closed_at}]' \
   2>/dev/null || echo "(unavailable)"
 echo ""
