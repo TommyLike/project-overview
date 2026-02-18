@@ -1,15 +1,14 @@
 # GitHub Project Analysis Guide
 
 ## Table of Contents
-1. [Decision Brief](#decision-brief) ← **Start here for decision-makers**
+1. [Decision Brief](#decision-brief)
 2. [Organizational Background](#org-background)
 3. [Real-World Adoption](#adoption)
 4. [Competitive Landscape](#competitive)
 5. [Momentum & Trajectory](#momentum)
 6. [Risk Assessment](#risk)
-7. [Code Quality & Maintainability](#code-quality) ← For technical audiences
-8. [Getting Started](#getting-started) ← For developer audiences
-9. [Trending Repos](#trending)
+7. [Technical Deep-Dive](#technical)
+8. [Trending Repos](#trending)
 
 ---
 
@@ -309,62 +308,209 @@ Check these explicitly:
 
 ---
 
-## Code Quality & Maintainability <a name="code-quality"></a>
+## Technical Deep-Dive <a name="technical"></a>
 
-> **Written to**: `technical.md` (first section)
+> **Written to**: `technical.md`
 
-**For technical audiences only.** Decision-makers should rely on Risk Assessment instead.
-
-### Translate findings into 3 verdicts (don't list raw signals)
-
-```markdown
-**Testing**: [Comprehensive / Adequate / Minimal / None]
-→ [one sentence of evidence, e.g., "pytest with 5 test tiers, CI enforced on every PR"]
-
-**CI/CD**: [Production-grade / Basic / Manual]
-→ [one sentence, e.g., "GitHub Actions on push to main and release branches, GPU runners"]
-
-**Maintenance discipline**: [Active / Stable / Declining]
-→ [one sentence, e.g., "Ruff + pre-commit enforced, mypy present but not mandatory"]
-```
-
-### Directory layout interpretation
-
-| Pattern | Meaning |
-|---------|---------|
-| `src/` or `lib/` | Main source code |
-| `test/` or `__tests__/` or `spec/` | Tests |
-| `docs/` | Documentation |
-| `examples/` | Usage examples |
-| `scripts/` | Build/dev scripts |
-| `packages/` | Monorepo packages |
-| `.github/` | CI/CD workflows, issue templates |
-
-### Red flags (translate to plain-language risk, not raw observations)
-
-| Observation | Plain-language risk |
-|------------|-------------------|
-| No test directory | Changes may break existing behavior silently |
-| No CI config | Releases are manual; quality depends on individual discipline |
-| Single giant file | High coupling — hard to contribute, extend, or debug |
-| All deps pinned to very old majors | Tech debt — upgrade cost likely significant |
-| No linting config | Code style inconsistency across contributors |
+Provides the technical context a decision-maker needs to evaluate what they're actually
+adopting: what the project does under the hood, what ideas it is built on, where to go
+deeper, and what a first experience with it looks like.
 
 ---
 
-## Getting Started <a name="getting-started"></a>
+### 1. Core Concepts & Mental Model
 
-> **Written to**: `technical.md` (second section, after Code Quality)
+**Goal**: Give the decision-maker the mental model to "get" the project in 5 minutes.
 
-**For developer audiences only.** Produce a minimal walkthrough to get something running.
+- **Core abstraction**: What is the primary concept the project introduces?
+  (e.g., "middleware", "modifier", "recipe", "plugin", "stream", "actor")
+- **One-sentence workflow**: input → transform → output in plain language
+- **Key terminology**: 5–8 domain-specific terms, each with a one-line definition
 
-1. **Prerequisites**: Runtime versions, system dependencies, OS constraints
-2. **Install**: Exact commands from README or package manager
-3. **Run**: Minimal command to get something working
-4. **First code example**: Simplest meaningful usage snippet
-5. **What to explore next**: Key docs, tutorials, or example directories
+  ```markdown
+  | Term | Definition |
+  |------|-----------|
+  | Recipe | A declarative config specifying which compression algorithms to apply |
+  | Modifier | A pluggable algorithm (e.g. GPTQ, SmoothQuant) implementing a compression step |
+  | ...  | ... |
+  ```
 
-Derive from: README, CONTRIBUTING.md, `docs/getting-started*`, `examples/`.
+- **Mental model paragraph**: One paragraph explaining *how to think about* this project —
+  not what it does, but the mental frame needed to use it effectively.
+
+Derive from: README overview / "How it works" section, `docs/concepts/`, introductory blog posts,
+any "design philosophy" or "motivation" section.
+
+---
+
+### 2. Architecture Overview
+
+**Goal**: Show how the system is structured so the decision-maker understands what they're committing to.
+
+**Diagram**: Check script output for architecture images in the repo. If found, note the path
+and describe what it shows:
+- Look for: `ARCHITECTURE.md`, `docs/architecture*`, images named `*arch*`, `*overview*`,
+  `*flow*`, `*diagram*` under `docs/assets/`, `docs/images/`, or referenced in README
+- Mermaid / PlantUML blocks in docs: copy them as-is with a fenced code block
+- If no diagram exists: produce a text-based component diagram using ASCII or a table
+
+**Component interaction**: How do the major pieces connect?
+- What is the call/data flow from user entry point through to output?
+- Where are the main extension/plugin points?
+
+**Layer structure**: What are the abstraction layers?
+
+```
+User API  (oneshot / model_free_ptq)
+    ↓
+Pipeline  (CalibrationPipeline)
+    ↓
+Modifiers (GPTQ, AWQ, SmoothQuant, ...)
+    ↓
+Observers (activation stats collection)
+    ↓
+Output    (compressed-tensors format → safetensors)
+```
+
+Derive from: `ARCHITECTURE.md`, source directory structure, `__init__.py` / `mod.rs` / `index.ts`
+top-level docstrings, README architecture diagrams.
+
+---
+
+### 3. Key Components
+
+**Goal**: Map directory structure to human-understandable module responsibilities.
+
+For each major module / package in the source tree, provide a table:
+
+```markdown
+| Component | Location | Responsibility |
+|-----------|----------|---------------|
+| Entrypoints | `src/xxx/entrypoints/` | Public API surface — `oneshot()`, `model_free_ptq()` |
+| Core | `src/xxx/core/` | Session lifecycle, modifier orchestration |
+| Modifiers | `src/xxx/modifiers/` | One subdirectory per algorithm (GPTQ, AWQ, ...) |
+| Pipelines | `src/xxx/pipelines/` | Calibration pipeline — runs modifiers in recipe order |
+| Recipe | `src/xxx/recipe/` | YAML ↔ Python object parsing |
+| Observers | `src/xxx/observers/` | Collect activation statistics during calibration |
+| ... | ... | ... |
+```
+
+Add a brief note for any component with a non-obvious design decision.
+
+Derive from: directory tree (depth 2–3 under `src/`), top-level docstrings in `__init__` files,
+README "Project Structure" section if present.
+
+---
+
+### 4. Research & Academic References
+
+**Goal**: Surface the theoretical foundations so readers can evaluate algorithmic claims
+and understand design decisions.
+
+**Where to look** (from script output):
+- `CITATION.cff` — formal citation file; extract title, authors, year, URL
+- `paper.md` — JOSS-style paper
+- README arXiv / DOI / proceedings links (script greps these automatically)
+- `references/` or `docs/references.bib`
+
+**Output format**:
+
+```markdown
+#### Academic Papers
+| Paper | Authors | Venue | Link |
+|-------|---------|-------|------|
+| GPTQ: Accurate Post-Training Quantization... | Frantar et al. | ICLR 2023 | [arXiv:2210.17323](https://arxiv.org/abs/2210.17323) |
+| SmoothQuant | Xiao et al. | ICML 2023 | [arXiv:2211.10438](https://arxiv.org/abs/2211.10438) |
+
+#### Technical Blog Posts & Talks
+| Title | Source | Link |
+|-------|--------|------|
+| LLM Compressor is here | Neural Magic Blog | [link](...) |
+| Talk at KubeCon 2024 | YouTube | [link](...) |
+```
+
+If no formal citation exists, grep README for `arxiv.org`, `doi.org`,
+`proceedings.mlr.press`, `aclanthology.org`, `openreview.net`.
+
+---
+
+### 5. Documentation & Learning Resources
+
+**Goal**: Give a complete map of official resources so the decision-maker can assess documentation quality and onboarding cost.
+
+```markdown
+| Resource | URL | What it covers |
+|----------|-----|---------------|
+| Official docs site | https://... | Full API reference and guides |
+| Getting started guide | https://.../getting-started | Install, first run |
+| API reference | https://.../api | All public classes and functions |
+| Examples directory | `examples/` (local) | End-to-end runnable scripts |
+| Community Slack/Discord | https://... | Live help, announcements |
+| GitHub Discussions | https://github.com/.../discussions | Q&A, RFCs |
+| Video tutorials | https://... | Walkthroughs (if available) |
+```
+
+**How to find the docs URL** (from script output):
+- `readthedocs.yaml` → project name → `https://{name}.readthedocs.io`
+- `mkdocs.yml` → `site_url:` field
+- `docusaurus.config.js` → `url:` field
+- Repo `homepage` field from GitHub API
+- README "Documentation" badge
+
+---
+
+### 6. Hello World
+
+**Goal**: The minimal, copy-pasteable path from zero to something working.
+
+1. **Prerequisites**: Runtime version, system dependencies, OS constraints
+   (e.g., "Python ≥ 3.10, Linux only, CUDA GPU required for calibration")
+
+2. **Install**:
+   ```bash
+   # exact command from README
+   pip install packagename
+   ```
+
+3. **Minimal working example**: The simplest snippet that produces meaningful output.
+   Pull from `examples/`, README quickstart, or docs getting-started page.
+   Prefer the shortest example that is still realistic (not a toy).
+
+4. **Expected output**: What should the user see when it works?
+   (file created, server started, metric printed, etc.)
+
+5. **Common pitfalls**: Top 2–3 things that commonly go wrong.
+   Derive from: open/closed issues tagged `bug` or `question`, README warnings, CONTRIBUTING notes.
+
+---
+
+### 7. Code Quality Signals
+
+Output **three verdicts** in plain language — do not list raw config files or tool names.
+
+```markdown
+**Testing**: [Comprehensive / Adequate / Minimal / None]
+→ [one evidence sentence, e.g., "pytest with 5 tiers (smoke/sanity/regression/integration/unit),
+   CI-enforced on every PR to main"]
+
+**CI/CD**: [Production-grade / Basic / Manual]
+→ [one evidence sentence, e.g., "GitHub Actions on push + PR to main and release/* branches,
+   dedicated GPU runners for integration tests"]
+
+**Maintenance discipline**: [Active / Stable / Declining]
+→ [one evidence sentence, e.g., "ruff check + format enforced in CI, pre-commit hooks present,
+   mypy present in dev deps but not yet enforced"]
+```
+
+Red flags (only mention ones actually observed):
+
+| Observation | Plain-language risk |
+|------------|-------------------|
+| No test directory | Silent regressions on changes |
+| No CI config | Release quality depends on individual discipline |
+| Single giant source file | High coupling — hard to contribute or debug |
+| Dependencies pinned to old majors | Significant upgrade debt |
+| No linting config | Style inconsistency across contributors |
 
 ---
 

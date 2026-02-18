@@ -10,9 +10,8 @@ description: >
   (4) momentum and growth trajectory,
   (5) adoption risk assessment (security, bus factor, breaking changes),
   (6) a final decision brief with a clear adopt/evaluate/avoid recommendation,
-  (7) code quality and maintainability signals (for technical audiences),
-  (8) getting-started guide (for developer audiences),
-  (9) trending GitHub repositories by language or time period.
+  (7) technical deep-dive: architecture, core concepts, key components, papers, docs links,
+  (8) trending GitHub repositories by language or time period.
   Triggers on: "analyze this GitHub repo", "should we adopt X", "compare X vs Y",
   "is X still maintained", "what's the risk of using X", "how popular is X",
   "explain this project", "how do I get started with X", "show me trending repos",
@@ -23,14 +22,10 @@ description: >
 
 ## Target audience
 
-This skill serves **two distinct audiences**. Select the output mode accordingly:
-
-| Audience | Primary modes |
-|----------|--------------|
-| **Decision-maker** (CTO, tech lead, architect) | Decision Brief · Org Background · Adoption · Competitive · Risk · Momentum |
-| **Developer** | Code Quality · Getting Started |
-
-When the user intent is unclear, default to **Decision-maker mode** (Decision Brief + Org Background + Adoption + Risk).
+This skill has **one audience: the decision-maker** (CTO, tech lead, architect, or anyone
+evaluating whether to adopt a project). Every section — including technical architecture,
+papers, and getting started — is written to help a decision-maker form a complete picture,
+not to serve developers looking for implementation details.
 
 ---
 
@@ -89,23 +84,24 @@ rm -rf <TEMP_DIR>
 
 ### 4. Select analysis mode based on user intent
 
-| User asks | Mode | Reference section |
-|-----------|------|------------------|
-| "Should we adopt X?" / "evaluate X" | **Decision Brief** | §Decision Brief |
-| "Who backs X?" / "is it corporate?" | Org Background | §Organizational Background |
-| "How widely used is X?" / "adoption?" | Real-World Adoption | §Real-World Adoption |
-| "X vs Y" / "alternatives to X" | Competitive Landscape | §Competitive Landscape |
-| "Is X growing?" / "is it trending?" | Momentum & Trajectory | §Momentum |
-| "Risk of using X?" / "is it maintained?" | Risk Assessment | §Risk Assessment |
-| "Code quality?" / "how is it structured?" | Code Quality | §Code Quality |
-| "How do I use it?" / "get started" | Getting Started | §Getting Started |
-| "Trending repos" / "what's popular" | Trending Search | §Trending |
+| User asks | Focus section(s) |
+|-----------|----------------|
+| "Analyze X" / "full report on X" | All 7 files (default) |
+| "Should we adopt X?" / "evaluate X" | index.md §Decision Brief |
+| "Who backs X?" / "is it corporate?" | background.md |
+| "How widely used is X?" | adoption.md |
+| "X vs Y" / "alternatives to X" | competitive.md |
+| "Is X growing?" / "still active?" | momentum.md |
+| "Risk of using X?" / "is it maintained?" | risk.md |
+| "How does X work?" / "architecture?" / "key concepts?" | technical.md §1–3 |
+| "Any papers?" / "research behind X?" / "docs?" | technical.md §4–5 |
+| "How do I try it?" / "quick start?" | technical.md §6 |
+| "Trending repos" / "what's popular" | Chat only — no files written |
 
 Read `references/analysis_guide.md` for detailed guidance on each section.
 
-**Default behavior**: If user intent is unspecified, produce:
-Decision Brief → Org Background → Adoption → Competitive → Risk → Momentum
-(skip Code Quality and Getting Started unless explicitly requested)
+**Default behavior**: If user intent is unspecified, always produce the **full report** —
+all 7 files. Every section contributes to a complete decision-maker picture.
 
 ### 5. Generate report files
 
@@ -122,15 +118,15 @@ Example: analyzing `vllm-project/llm-compressor` → `./reports/vllm-project-llm
 
 #### File layout and content responsibilities
 
-| File | Content | Audience |
-|------|---------|----------|
-| `index.md` | Decision Brief + key metrics table + one-sentence summary per section + links | Everyone |
-| `background.md` | Org backing, governance model, commercial relationship | Decision-maker |
-| `adoption.md` | Download stats, dependents, named adopters, ecosystem, cloud support | Decision-maker |
-| `competitive.md` | Alternatives table, market positioning, when to pick this vs others | Decision-maker |
-| `momentum.md` | Star velocity, release cadence, PR/issue health, lifecycle stage | Decision-maker |
-| `risk.md` | Bus factor, security, breaking-change history, abandonment signals, license | Decision-maker |
-| `technical.md` | Code quality signals + getting started guide | Developer |
+| File | Content |
+|------|---------|
+| `index.md` | Decision Brief + key metrics table + one-sentence summary per section + links |
+| `background.md` | Org backing, governance model, commercial relationship |
+| `adoption.md` | Download stats, dependents, named adopters, ecosystem, cloud support |
+| `competitive.md` | Alternatives table, market positioning, when to pick this vs others |
+| `momentum.md` | Star velocity, release cadence, PR/issue health, lifecycle stage |
+| `risk.md` | Bus factor, security, breaking-change history, abandonment signals, license |
+| `technical.md` | Core concepts · Architecture · Key components · Papers · Docs links · Hello World · Code quality |
 
 #### Writing order
 

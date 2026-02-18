@@ -351,6 +351,105 @@ done
 echo ""
 
 # ---------------------------------------------------------------
+# SECTION 6b: Technical deep-dive data (architecture, papers, docs)
+# ---------------------------------------------------------------
+
+echo "### Academic Papers & Citations"
+if [ -f "$REPO_DIR/CITATION.cff" ]; then
+  echo "(CITATION.cff found)"
+  cat "$REPO_DIR/CITATION.cff"
+elif [ -f "$REPO_DIR/paper.md" ]; then
+  echo "(paper.md found — JOSS paper)"
+  cat "$REPO_DIR/paper.md"
+else
+  echo "(no CITATION.cff or paper.md)"
+fi
+
+# Grep README and docs for paper links
+echo ""
+echo "--- Paper/DOI links found in README ---"
+if [ -n "$README" ]; then
+  grep -oE '(https?://(arxiv\.org|doi\.org|proceedings\.mlr\.press|aclanthology\.org|openreview\.net|dl\.acm\.org|papers\.nips\.cc)[^)> "]*|arXiv:[0-9]+\.[0-9]+)' \
+    "$README" 2>/dev/null | sort -u || echo "(none found)"
+fi
+echo ""
+echo "--- Blog/announcement links found in README ---"
+if [ -n "$README" ]; then
+  grep -oiE 'https?://[^)> "]*blog[^)> "]*' "$README" 2>/dev/null | sort -u \
+    || echo "(none found)"
+fi
+echo ""
+
+echo "### Documentation Site"
+# Check common doc config files for the site URL
+DOC_URL=""
+if [ -f "$REPO_DIR/mkdocs.yml" ]; then
+  echo "(mkdocs.yml found)"
+  DOC_URL=$(grep -E '^\s*site_url:' "$REPO_DIR/mkdocs.yml" 2>/dev/null \
+    | sed 's/.*site_url:\s*//' | tr -d "\"'" | head -1 || true)
+  grep -E '^\s*(site_name|site_url|site_description|repo_url|docs_dir):' \
+    "$REPO_DIR/mkdocs.yml" 2>/dev/null | head -10
+fi
+if [ -f "$REPO_DIR/.readthedocs.yaml" ] || [ -f "$REPO_DIR/.readthedocs.yml" ]; then
+  RTD_FILE=$(ls "$REPO_DIR"/.readthedocs.y*ml 2>/dev/null | head -1)
+  echo "(readthedocs config found: $RTD_FILE)"
+  cat "$RTD_FILE" 2>/dev/null | head -20
+fi
+if [ -f "$REPO_DIR/docusaurus.config.js" ] || [ -f "$REPO_DIR/docusaurus.config.ts" ]; then
+  DOCU_FILE=$(ls "$REPO_DIR"/docusaurus.config.* 2>/dev/null | head -1)
+  echo "(docusaurus config found: $DOCU_FILE)"
+  grep -E '(url|baseUrl|tagline|title)\s*:' "$DOCU_FILE" 2>/dev/null | head -10
+fi
+# Also surface the homepage from repo JSON
+echo ""
+echo "Repo homepage (from GitHub API): $(echo "$REPO_JSON" | jq -r '.homepage // "(none)"' 2>/dev/null)"
+echo ""
+
+echo "### Architecture Files & Diagrams"
+# Look for dedicated architecture docs
+for f in ARCHITECTURE.md ARCHITECTURE.rst DESIGN.md DESIGN.rst \
+          docs/architecture.md docs/ARCHITECTURE.md docs/design.md; do
+  if [ -f "$REPO_DIR/$f" ]; then
+    echo "(found: $f)"
+    head -60 "$REPO_DIR/$f"
+    echo ""
+  fi
+done
+
+# List diagram images
+echo "--- Diagram/architecture images in repo ---"
+find "$REPO_DIR" -maxdepth 4 \
+  -not -path '*/.git/*' \
+  \( \
+    -iname "*arch*"     -o -iname "*architecture*" \
+    -o -iname "*overview*" -o -iname "*diagram*" \
+    -o -iname "*flow*"   -o -iname "*design*" \
+    -o -iname "*structure*" \
+  \) \
+  \( -name "*.png" -o -name "*.svg" -o -name "*.jpg" -o -name "*.gif" -o -name "*.webp" \) \
+  2>/dev/null | sort | head -20 \
+  | sed "s|$REPO_DIR/||" \
+  || echo "(none found)"
+
+# Also look for mermaid or plantuml blocks in any .md file
+echo ""
+echo "--- Mermaid/PlantUML diagram blocks in docs ---"
+find "$REPO_DIR" -maxdepth 4 -name "*.md" -not -path '*/.git/*' \
+  -exec grep -l '```mermaid\|```plantuml\|@startuml' {} \; 2>/dev/null \
+  | sed "s|$REPO_DIR/||" | head -10 \
+  || echo "(none found)"
+echo ""
+
+echo "### Examples Directory Overview"
+if [ -d "$REPO_DIR/examples" ]; then
+  echo "(examples/ found — top-level contents)"
+  ls -1 "$REPO_DIR/examples/" 2>/dev/null | head -30
+else
+  echo "(no examples/ directory)"
+fi
+echo ""
+
+# ---------------------------------------------------------------
 # SECTION 7: Local git stats
 # ---------------------------------------------------------------
 
