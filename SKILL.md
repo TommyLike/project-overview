@@ -20,7 +20,7 @@ description: >
 
 # GitHub Project Analyzer
 
-## Target audience
+## Target Audience
 
 This skill has **one audience: the decision-maker** (CTO, tech lead, architect, or anyone
 evaluating whether to adopt a project). Every section — including technical architecture,
@@ -57,7 +57,7 @@ available in the current session.
 
 **For each missing skill**, stop and tell the user:
 
-```
+```text
 ⚠️  Missing dependency: the `<skill-name>` skill is not installed.
 
 This skill is needed for: <purpose from table above>.
@@ -96,7 +96,7 @@ bash <skill-dir>/scripts/analyze_repo.sh <github-url-or-owner/repo>
 
 The script outputs two important paths at the end:
 
-```
+```text
 LOCAL_REPO_PATH=/tmp/github-analyzer-XXXXXX/repo
 TEMP_DIR=/tmp/github-analyzer-XXXXXX
 ```
@@ -120,7 +120,7 @@ Use the **Read** tool on files from `LOCAL_REPO_PATH` that are most relevant to 
 | Getting Started | `README.md`, `docs/getting-started*`, `examples/` |
 
 Use **Glob** and **Grep** for targeted searches:
-```
+```text
 # Find adopter/user mentions
 pattern: "(?i)(production|used by|powered by|built with|case study)"  path: <LOCAL_REPO_PATH>
 
@@ -179,7 +179,7 @@ markdown files so the user can navigate and reference them easily.
 
 Every report lives under a project directory split into two language subdirectories:
 
-```
+```text
 ./reports/{owner}-{reponame}/
 ├── en/          ← English originals (written first)
 │   ├── index.md
@@ -279,7 +279,7 @@ Translation rules:
 After both `en/` and `zh/` are complete, write a single bilingual entry-point file at the
 **project root** (same level as `en/` and `zh/`):
 
-```
+```text
 ./reports/{owner}-{reponame}/introduction.md
 ```
 
@@ -311,7 +311,7 @@ as well).
 #### After writing all files
 
 Tell the user:
-```
+```text
 报告已生成：
   入口：  ./reports/{owner}-{reponame}/introduction.md
   英文版：./reports/{owner}-{reponame}/en/index.md
