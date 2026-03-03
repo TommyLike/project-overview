@@ -26,6 +26,13 @@ The required output format for any decision-maker analysis. Always produce this 
 even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 
 ```markdown
+# {Project Name} — Analysis Report
+
+<!-- Logo header: include only when logo.png was generated via gemini-image in Step 1b -->
+<p align="center">
+  <img src="../logo.png" alt="{Project Name} logo" width="120" />
+</p>
+
 ## Decision Brief: <Project Name>
 
 **Verdict**: Adopt ✅ | Evaluate ⚠️ | Avoid ❌
@@ -573,14 +580,18 @@ For each major module / package in the source tree, provide a table:
 ```markdown
 | Component | Location | Responsibility |
 |-----------|----------|---------------|
-| Entrypoints | `src/xxx/entrypoints/` | Public API surface — `oneshot()`, `model_free_ptq()` |
-| Core | `src/xxx/core/` | Session lifecycle, modifier orchestration |
-| Modifiers | `src/xxx/modifiers/` | One subdirectory per algorithm (GPTQ, AWQ, ...) |
-| Pipelines | `src/xxx/pipelines/` | Calibration pipeline — runs modifiers in recipe order |
-| Recipe | `src/xxx/recipe/` | YAML ↔ Python object parsing |
-| Observers | `src/xxx/observers/` | Collect activation statistics during calibration |
+| Entrypoints | [`src/xxx/entrypoints/`](https://github.com/{owner}/{repo}/tree/{default_branch}/src/xxx/entrypoints/) | Public API surface — `oneshot()`, `model_free_ptq()` |
+| Core | [`src/xxx/core/`](https://github.com/{owner}/{repo}/tree/{default_branch}/src/xxx/core/) | Session lifecycle, modifier orchestration |
+| Modifiers | [`src/xxx/modifiers/`](https://github.com/{owner}/{repo}/tree/{default_branch}/src/xxx/modifiers/) | One subdirectory per algorithm (GPTQ, AWQ, ...) |
+| Pipelines | [`src/xxx/pipelines/`](https://github.com/{owner}/{repo}/tree/{default_branch}/src/xxx/pipelines/) | Calibration pipeline — runs modifiers in recipe order |
+| Recipe | [`src/xxx/recipe/`](https://github.com/{owner}/{repo}/tree/{default_branch}/src/xxx/recipe/) | YAML ↔ Python object parsing |
+| Observers | [`src/xxx/observers/`](https://github.com/{owner}/{repo}/tree/{default_branch}/src/xxx/observers/) | Collect activation statistics during calibration |
 | ... | ... | ... |
 ```
+
+> Replace `{owner}`, `{repo}`, and `{default_branch}` with actual values from the script
+> output. Always link directory paths with the `/tree/` GitHub URL prefix and file paths
+> with `/blob/`.
 
 Add a brief note for any component with a non-obvious design decision.
 
@@ -631,11 +642,15 @@ If no formal citation exists, grep README for `arxiv.org`, `doi.org`,
 | Official docs site | https://... | Full API reference and guides |
 | Getting started guide | https://.../getting-started | Install, first run |
 | API reference | https://.../api | All public classes and functions |
-| Examples directory | `examples/` (local) | End-to-end runnable scripts |
+| Examples directory | [`examples/`](https://github.com/{owner}/{repo}/tree/{default_branch}/examples/) | End-to-end runnable scripts |
 | Community Slack/Discord | https://... | Live help, announcements |
-| GitHub Discussions | https://github.com/.../discussions | Q&A, RFCs |
+| GitHub Discussions | https://github.com/{owner}/{repo}/discussions | Q&A, RFCs |
 | Video tutorials | https://... | Walkthroughs (if available) |
 ```
+
+> Any local repository resource (a directory, a config file, a doc file) must be linked
+> using its full GitHub URL — not listed as a bare local path. Replace `{owner}`, `{repo}`,
+> and `{default_branch}` with actual values from the script output.
 
 **How to find the docs URL** (from script output):
 - `readthedocs.yaml` → project name → `https://{name}.readthedocs.io`

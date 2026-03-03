@@ -31,16 +31,16 @@ not to serve developers looking for implementation details.
 
 ## Dependencies
 
-This skill requires two companion skills to be installed and available. Each one is
-invoked automatically during analysis:
+This skill requires two companion skills to be installed and available, and one optional skill:
 
-| Skill | When used | What happens without it |
-|-------|-----------|------------------------|
-| `read-arxiv-paper` | **technical.md §Research & Papers** — when the project links to arXiv/DOI papers, this skill is invoked to produce a structured paper summary instead of a bare URL | Papers are listed as plain links only; no summary or key-takeaways |
-| `translate` | **On demand** — when the user requests the report (or a section) in a language other than English | Output is English only; translation requests cannot be fulfilled |
+| Skill | Required? | When used | What happens without it |
+|-------|-----------|-----------|------------------------|
+| `read-arxiv-paper` | Required | **technical.md §Research & Papers** — when the project links to arXiv/DOI papers, this skill is invoked to produce a structured paper summary instead of a bare URL | Papers are listed as plain links only; no summary or key-takeaways |
+| `translate` | Required | **On demand** — when the user requests the report (or a section) in a language other than English | Output is English only; translation requests cannot be fulfilled |
+| `gemini-image` | Optional | **Step 1b** — generates an AI logo image for the project, saved as `logo.png` and embedded in `index.md` | Logo section is skipped; index.md has no logo header |
 
 **Installation**: Skills are installed via Claude Code settings or the skill marketplace.
-If a skill is missing, the dependency check (Step 0 below) will tell the user exactly
+If a required skill is missing, the dependency check (Step 0 below) will tell the user exactly
 what to install before analysis begins.
 
 ---
@@ -74,14 +74,17 @@ Once installed, restart the session and try again.
 |-------|----------------|
 | `read-arxiv-paper` | `npx skills add https://github.com/sunqb/ccsdk --skill read-arxiv-paper` |
 | `translate` | `npx skills add https://github.com/sunqb/ccsdk --skill translate` |
+| `gemini-image` (optional) | `npx skills add https://github.com/sunqb/ccsdk --skill gemini-image` |
 
 **Degraded-mode exception**: If the user explicitly says "proceed anyway / 继续":
 - Missing `read-arxiv-paper` → list paper URLs in technical.md without summaries; add a note:
   `> ⚠️ read-arxiv-paper skill not installed — paper summaries unavailable.`
 - Missing `translate` → continue in English; add a note at the top of index.md:
   `> ⚠️ translate skill not installed — report is English only.`
+- Missing `gemini-image` → skip logo generation entirely; omit the logo section from index.md.
+  No warning needed — logo is optional.
 
-Do NOT silently skip the check. Always surface missing dependencies to the user.
+Do NOT silently skip the check for required skills. Always surface missing required dependencies to the user.
 
 ---
 
@@ -130,6 +133,49 @@ The script collects:
 - **Package registries**: PyPI downloads, npm downloads (where applicable)
 - **Local** (cloned files): README, manifests, CI configs, community health files,
   CHANGELOG/breaking-change history, git stats, org/sponsorship files
+
+### 1b. Generate project logo (optional — requires `gemini-image` skill)
+
+If the `gemini-image` skill is available, invoke it immediately after the script completes
+to generate a unique AI logo for the project. This logo is embedded at the top of both
+`en/index.md` and `zh/index.md`.
+
+**Prompt construction**: Build the image prompt from script output fields:
+
+```text
+A clean, modern logo for an open source project called "{repo_name}".
+{description}. Style: minimalist, flat design, single icon, no text,
+suitable for a technical README. Primary color should reflect the
+project's main programming language: {language}.
+```
+
+Where:
+- `{repo_name}` = repository name from script output (e.g., `llm-compressor`)
+- `{description}` = repo description field (first sentence only, max 20 words)
+- `{language}` = primary language from script output (e.g., `Python → blue`,
+  `JavaScript → yellow`, `Go → cyan`, `Rust → orange`, `default → indigo`)
+
+**Language-to-color mapping** (use in prompt for visual consistency):
+
+| Language | Color hint |
+|----------|-----------|
+| Python | blue |
+| JavaScript / TypeScript | yellow |
+| Go | cyan |
+| Rust | orange |
+| Java / Kotlin | red |
+| C / C++ | purple |
+| Ruby | crimson |
+| Other / unknown | indigo |
+
+**After generation**:
+1. Save the generated image as `./reports/{owner}-{reponame}/logo.png`
+2. Note the relative path for use in index.md: `../logo.png` (from en/ or zh/ subdirectory)
+
+**If `gemini-image` is unavailable**: Skip this step entirely. The `logo.png` file will not
+exist and index.md will be written without a logo header (see Step 5a).
+
+---
 
 ### 2. Read key local files
 
@@ -267,6 +313,29 @@ Example: analyzing `vllm-project/llm-compressor` →
 | `risk.md` | Bus factor, security, breaking-change history, abandonment signals, license |
 | `technical.md` | Core concepts · Architecture · Key components · Papers · Docs links · Hello World · Code quality |
 
+#### Repository path linking rule
+
+Whenever you reference a file or directory from the analyzed repository by its relative
+path in any report section, **always render it as a clickable GitHub link** — never as a
+plain backtick string or local path. Use the `default_branch` value from the script output
+(Section 1, `"default_branch"` field; fall back to `"main"` if not captured).
+
+| Path type | Markdown format |
+|-----------|----------------|
+| File | `[path/to/file.md](https://github.com/{owner}/{repo}/blob/{default_branch}/path/to/file.md)` |
+| Directory | `[path/to/dir/](https://github.com/{owner}/{repo}/tree/{default_branch}/path/to/dir/)` |
+
+Examples (for `https://github.com/vllm-project/llm-compressor`, branch `main`):
+- `` `src/llmcompressor/modifiers/` `` → [`src/llmcompressor/modifiers/`](https://github.com/vllm-project/llm-compressor/tree/main/src/llmcompressor/modifiers/)
+- `` `CHANGELOG.md` `` → [`CHANGELOG.md`](https://github.com/vllm-project/llm-compressor/blob/main/CHANGELOG.md)
+
+Apply this rule consistently in:
+- `technical.md §Key Components` — Location column
+- `technical.md §Documentation` — Examples directory row and any local resource links
+- `technical.md §Architecture` — references to architecture files or diagram images
+- `risk.md` — references to `SECURITY.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, etc.
+- Any other section that cites a specific file or directory from the repository
+
 #### Step 5a — Write English report (`en/`)
 
 Write all 7 files to the `en/` subdirectory. Order: **6 dimension files first**
@@ -278,6 +347,12 @@ Use the **Write** tool for every file. Parent directories are created automatica
 
 ```markdown
 # {Project Name} — Analysis Report
+
+<!-- Logo: only include if logo.png was generated in Step 1b -->
+<p align="center">
+  <img src="../logo.png" alt="{Project Name} logo" width="120" />
+</p>
+
 > **Source**: {github-url} | **Analyzed**: {YYYY-MM-DD}
 
 ## Decision Brief
