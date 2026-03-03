@@ -1,0 +1,16 @@
+dataDir: ~/.agent-orchestrator
+worktreeDir: ~/.worktrees
+port: 3001
+defaults:
+  runtime: tmux
+  agent: claude-code
+  workspace: worktree
+  notifiers:
+    - desktop
+projects:
+  project-overview:
+    name: project-overview
+    sessionPrefix: po
+    repo: TommyLike/project-overview
+    path: /Users/husheng/codes/project-overview
+    defaultBranch: main
