@@ -1,5 +1,9 @@
 # GitHub Project Analysis Guide
 
+> **Guide version**: 1.1 · **Last updated**: 2026-02-20
+> Download benchmarks, bus-factor ratios, and calibration thresholds reflect the ecosystem
+> as of early 2026. Review annually or whenever reports yield systematically skewed verdicts.
+
 ## Table of Contents
 1. [Decision Brief](#decision-brief)
 2. [Organizational Background](#org-background)
@@ -9,6 +13,8 @@
 6. [Risk Assessment](#risk)
 7. [Technical Deep-Dive](#technical)
 8. [Trending Repos](#trending)
+9. [Handling Missing Data](#missing-data)
+10. [Analysis Depth by Mode](#depth-by-mode)
 
 ---
 
@@ -87,6 +93,48 @@ even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 - Whether the project predates or postdates the company's founding
 - Any announced acquisition, pivot, or shutdown risk
 
+### Output template
+
+```markdown
+# Organizational Background — {Project Name}
+
+> **Source**: {github-url} | **Analyzed**: {YYYY-MM-DD}
+
+## Backing Entity
+
+[2–3 paragraphs: who owns the project, lineage/acquisition/founding history,
+relationship between the OSS project and any commercial entity.]
+
+## Governance Model
+
+| Mechanism | Detail |
+|-----------|--------|
+| Governance type | [BDFL / Core team / Foundation steering committee] |
+| Key governance files | [e.g., GOVERNANCE.md, MAINTAINERS, .github/CODEOWNERS — what each says] |
+| Named maintainers | [count + affiliation] |
+| Contribution process | [PR workflow, CLA requirement, merge automation] |
+
+## Commercial Relationship
+
+- **Business model**: [open-core / fully open-source / marketing vehicle / internal tool]
+- **Paid/enterprise tier**: [yes — link | no]
+- **Primary sponsors/funders**: [FUNDING.yml entries / Open Collective / none — commercially funded]
+- **Incentive alignment**: [why the backing org continues to invest]
+
+## Sustainability Assessment
+
+| Signal | Assessment |
+|--------|------------|
+| Backing type | [FAANG / Foundation / VC-backed startup / Individual] |
+| Financial stability | [High / Medium / Low — rationale] |
+| Acquisition / pivot / shutdown risk | [Low / Medium / High — rationale] |
+| Community independence | [Would the project survive if the primary backer stepped away?] |
+
+## Summary
+
+[1 paragraph synthesis of organizational health and long-term viability outlook]
+```
+
 ---
 
 ## Real-World Adoption <a name="adoption"></a>
@@ -103,7 +151,7 @@ even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 - crates.io: `https://crates.io/api/v1/crates/{name}`
 - Docker Hub: `https://hub.docker.com/v2/repositories/{org}/{name}/`
 
-**Benchmark downloads** (rough calibration):
+**Benchmark downloads** (rough calibration — PyPI/npm scale):
 
 | Weekly downloads | Adoption level |
 |-----------------|----------------|
@@ -111,6 +159,21 @@ even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 | 10K – 500K | Growing, real user base |
 | 500K – 5M | Mainstream in its niche |
 | > 5M | Category standard (e.g., React, requests) |
+
+**Ecosystem-specific calibration** (scale varies significantly across registries):
+
+| Ecosystem | Niche threshold | Category-standard threshold | Download API |
+|-----------|----------------|-----------------------------|-------------|
+| PyPI (Python) | < 10K/week | > 5M/week | pypistats.org/api |
+| npm (JS/TS) | < 50K/week | > 10M/week | api.npmjs.org/downloads |
+| crates.io (Rust) | < 5K/week | > 500K/week | crates.io/api/v1/crates |
+| RubyGems | < 5K/week | > 1M/week | rubygems.org/api |
+| Docker Hub pulls | < 1M total | > 100M total | hub.docker.com/v2/repositories |
+| Maven Central (Java) | No reliable download API — use GitHub dependents instead | — | — |
+| Go modules | No central download stats — use GitHub stars + dependents | — | — |
+
+For Go, Java, and other ecosystems without download APIs, weight **GitHub dependents count**
+and **named adopters** more heavily than download figures.
 
 **GitHub dependents count** (from script):
 - Number of public repos that import this package → direct proxy for developer adoption
@@ -137,6 +200,62 @@ even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 - Stack Overflow: search `[project-name]` tag → question count and recency
 - Reddit: subreddit existence and activity
 - Discord / Slack: member count if publicly listed
+
+### Output template
+
+```markdown
+# Real-World Adoption — {Project Name}
+
+> **Source**: {github-url} | **Analyzed**: {YYYY-MM-DD}
+
+## Download Statistics
+
+| Metric | Value | Interpretation |
+|--------|-------|---------------|
+| [PyPI/npm/crates.io] weekly downloads | ... | [Niche / Growing / Mainstream / Category standard] |
+| [PyPI/npm] monthly downloads | ... | [annualized estimate] |
+| GitHub stars | ... | [downloads-to-stars ratio context] |
+| GitHub forks | ... | [fork rate interpretation] |
+| GitHub dependents | ... | [public repos importing this package] |
+
+[1 paragraph contextualizing the numbers relative to similar tools in the same niche.]
+
+## Named Adopters
+
+[List known production users from ADOPTERS.md / USERS.md / README logos / blog posts.
+If none found, state explicitly and list indirect signals (pre-compressed model checkpoints,
+conference talks, case studies).]
+
+## Ecosystem Integration
+
+| Integration | Status | Significance |
+|-------------|--------|-------------|
+| [Tool/platform] | [Native / Plugin / Partial / None] | [why it matters] |
+
+## Community Channels
+
+| Channel | Detail |
+|---------|--------|
+| [Slack/Discord] | [member count or activity level] |
+| GitHub Issues | [open count; avg. response time] |
+| Stack Overflow tag | [`[tag-name]` — N questions, last activity] |
+
+## Cloud & Platform Support
+
+[Managed services, first-party cloud integrations, or "none — library only".]
+
+## Adoption Assessment
+
+| Dimension | Signal |
+|-----------|--------|
+| Download volume | [Niche / Growing / Mainstream / Category standard] |
+| Ecosystem fit | [Tight / Good / Loose] |
+| Named enterprise users | [None found / Few / Many] |
+| Community activity | [High / Medium / Low] |
+| Adoption stage | [Experimental / Growing / Mainstream / Declining] |
+
+**Bottom line**: [1–2 sentence synthesis]
+```
 
 ---
 
@@ -235,6 +354,69 @@ Synthesize all signals into one of:
 | **Mature/Stable** | Large user base, slow star growth, few breaking changes, predictable releases |
 | **Maintenance Mode** | No new features, only bug fixes, team shrinking |
 | **Declining** | Issues unanswered, PRs stalling, maintainers stepping back publicly |
+
+### Output template
+
+```markdown
+# Momentum & Trajectory — {Project Name}
+
+> **Source**: {github-url} | **Analyzed**: {YYYY-MM-DD}
+
+## Life-Cycle Stage: **[Early Growth / Rapid Growth / Mature/Stable / Maintenance Mode / Declining]**
+
+## Star & Fork Velocity
+
+| Metric | Value | Rate |
+|--------|-------|------|
+| Total stars | ... | ~N stars/month since creation |
+| Total forks | ... | N% fork-to-star ratio |
+| Created | YYYY-MM-DD | ~N months/years old |
+| Last pushed | YYYY-MM-DD | [today / N days ago / N months ago] |
+
+[1 paragraph interpreting velocity in context of the project's niche and life-cycle stage.]
+
+## Release Cadence
+
+| Release | Date | Time since previous |
+|---------|------|-------------------|
+| vX.Y.Z | YYYY-MM-DD | N days |
+| ... | ... | ... |
+
+**Pattern**: [Active development / Maintenance mode / Sporadic / Abandoned — with evidence]
+
+## Issue & PR Health
+
+| Signal | Value | Assessment |
+|--------|-------|------------|
+| Open PRs | N | [Healthy / Backlog forming / Stalled] |
+| Oldest open PR | YYYY-MM-DD (~N months) | [context] |
+| Issue response time | [hours / days / weeks] | [Excellent / Adequate / Poor] |
+| Open issues | N | [Normal / Accumulating without response] |
+
+## Feature Velocity
+
+[Recent release highlights — 3–5 significant additions from the last 1–2 versions.
+If only bug fixes, state "maintenance mode" explicitly.]
+
+## Contributor Trends
+
+| Metric | Value |
+|--------|-------|
+| Total contributors | N |
+| New contributors (last 6 months) | N |
+| Top contributor share | N% of commits |
+
+## Media & Community Signals
+
+| Signal | Detail |
+|--------|--------|
+| [HackerNews / conference / developer survey] | [front-page hits / keynote / listed] |
+
+## Trajectory Outlook
+
+[1 paragraph: is the project accelerating, plateauing, or declining? What structural
+factors drive the outlook? What risks could change the trajectory?]
+```
 
 ---
 
@@ -353,6 +535,11 @@ and describe what it shows:
   `*flow*`, `*diagram*` under `docs/assets/`, `docs/images/`, or referenced in README
 - Mermaid / PlantUML blocks in docs: copy them as-is with a fenced code block
 - If no diagram exists: produce a text-based component diagram using ASCII or a table
+
+**Scope for ASCII/text diagrams**: Show 3–6 top-level components and their connections.
+Do not attempt to map every class or function — the goal is a 30-second mental model,
+not a complete UML diagram. A table of components (§3 Key Components) is more appropriate
+for exhaustive detail.
 
 **Component interaction**: How do the major pieces connect?
 - What is the call/data flow from user entry point through to output?
@@ -502,15 +689,25 @@ Output **three verdicts** in plain language — do not list raw config files or 
    mypy present in dev deps but not yet enforced"]
 ```
 
-Red flags (only mention ones actually observed):
+**If any red flag is observed, append it inline under the most relevant verdict**:
 
-| Observation | Plain-language risk |
-|------------|-------------------|
-| No test directory | Silent regressions on changes |
-| No CI config | Release quality depends on individual discipline |
-| Single giant source file | High coupling — hard to contribute or debug |
-| Dependencies pinned to old majors | Significant upgrade debt |
-| No linting config | Style inconsistency across contributors |
+```markdown
+**Testing**: Minimal
+→ Only two test files found; no CI enforcement.
+  ⚠️ *Red flag*: Silent regressions likely on contributions.
+```
+
+Only mention red flags actually observed. Omit the red flag line entirely if none apply.
+
+Reference table of red flags:
+
+| Observation | Plain-language risk | Most relevant verdict |
+|------------|-------------------|-----------------------|
+| No test directory | Silent regressions on changes | Testing |
+| No CI config | Release quality depends on individual discipline | CI/CD |
+| Single giant source file | High coupling — hard to contribute or debug | Maintenance discipline |
+| Dependencies pinned to old majors | Significant upgrade debt | Maintenance discipline |
+| No linting config | Style inconsistency across contributors | Maintenance discipline |
 
 ---
 
@@ -533,3 +730,52 @@ gh api "search/repositories?q=language:python+created:>$(date -v-7d +%Y-%m-%d 2>
 Present as a ranked table: **Rank · Repo · Stars · Language · One-line description**.
 
 Default: all languages, past 7 days, top 10.
+
+---
+
+## Handling Missing Data <a name="missing-data"></a>
+
+> **Cross-cutting guideline** — applies to all sections.
+
+Data will sometimes be unavailable (new projects, API failures, private registries).
+
+| Situation | Convention |
+|-----------|-----------|
+| Metric not collected / API failed | `N/A (source unavailable)` |
+| File not present in repo | `Not found` + note why it matters |
+| Project too new for trend data | `Insufficient history (<6 months)` |
+| No CHANGELOG | Note absence explicitly in risk.md Breaking Change section |
+| No named adopters found | State "No public adopters listed" — do not invent or speculate |
+
+**For very new projects** (< 6 months old or < 500 stars):
+- Skip star velocity calculation (insufficient data for a meaningful rate).
+- Skip download trend analysis (too early to be meaningful).
+- Flag prominently in the Decision Brief:
+  > ⚠️ Early-stage project — most adoption and momentum signals are premature.
+  > Evaluate primarily based on organizational backing and technical merit.
+
+---
+
+## Analysis Depth by Mode <a name="depth-by-mode"></a>
+
+When the user requests a **partial report** (single section), apply these depth guidelines
+rather than the full-report standard:
+
+| Mode | Files written | Depth standard |
+|------|--------------|----------------|
+| Full report (default) | All 7 + introduction.md | All subsections at maximum depth; all templates filled |
+| Single section (e.g., "just the risk") | That one dimension file + index.md | Dimension file at full depth; index.md with Decision Brief only; other 5 files skipped |
+| Quick overview ("should I adopt X?") | index.md only | Decision Brief + Key Metrics + one-sentence summaries; target ≤ 1 page |
+| Compare mode (X vs Y) | Full reports for both + chat summary | No depth reduction |
+| Trending repos | Chat table only | No files written |
+
+**Quick overview index.md**: When writing index.md only, derive section summaries from
+script data without writing the full dimension files. Mark each row in the Contents table
+with `[not generated]` in place of a file link:
+
+```markdown
+| Section | Summary | File |
+|---------|---------|------|
+| Organizational Background | [one sentence] | *not generated* |
+| Real-World Adoption | [one sentence] | *not generated* |
+```

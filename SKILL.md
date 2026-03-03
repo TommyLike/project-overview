@@ -87,12 +87,36 @@ Do NOT silently skip the check. Always surface missing dependencies to the user.
 
 ### 1. Clone & gather data
 
+**Check for an existing report first**: Before running the script, check whether
+`./reports/{owner}-{reponame}/` already exists.
+- If it exists and the user gave no explicit instruction, ask:
+  > "A report for this project already exists. Re-run full analysis (overwrites), update
+  > specific sections only, or view the existing report?"
+- If the user says "proceed" / "overwrite" / gives no preference → continue below.
+
+**Finding `<skill-dir>`**: This is the directory containing this `SKILL.md` file
+(the repository root). If installed via `npx skills add`, the installer prints the path.
+You can also locate it with:
+```bash
+find ~/.claude -name analyze_repo.sh 2>/dev/null | head -1 | xargs dirname
+```
+
 Run the analysis script. It clones the repo into a local temp directory and fetches
 remote metadata via the `gh` CLI (falls back to unauthenticated `curl` if needed):
 
 ```bash
 bash <skill-dir>/scripts/analyze_repo.sh <github-url-or-owner/repo>
 ```
+
+**If the script fails or returns incomplete data**:
+- **Clone failure** → verify the URL is a public repo; try `gh repo view <owner>/<repo>`
+  to confirm access.
+- **GitHub API rate-limit** → configure a token (see Tips §GitHub Token) and re-run; or
+  continue with only local clone data, marking remote fields as `N/A (API unavailable)`.
+- **PyPI/npm/registry API failure** → mark download stats as
+  `N/A (registry unavailable — {date})` and continue.
+- **General rule**: never halt the entire report for a single data-source failure. Write
+  all sections with available data; use `N/A` markers where data is missing.
 
 The script outputs two important paths at the end:
 
@@ -170,6 +194,33 @@ Read `references/analysis_guide.md` for detailed guidance on each section.
 **Default behavior**: If user intent is unspecified, always produce the **full report** —
 all 7 files. Every section contributes to a complete decision-maker picture.
 
+#### Compare mode (X vs Y)
+
+When the user asks to compare two projects (e.g., "X vs Y", "compare X and Y"):
+
+1. Run the script for **each repo separately**:
+   ```bash
+   bash <skill-dir>/scripts/analyze_repo.sh <url-or-owner/repo-A>
+   bash <skill-dir>/scripts/analyze_repo.sh <url-or-owner/repo-B>
+   ```
+2. Generate **full reports for both** projects under their respective directories
+   (`./reports/{owner-A}-{repo-A}/` and `./reports/{owner-B}-{repo-B}/`).
+3. In `competitive.md` of **each** project, ensure the other appears in the comparison table.
+4. After both report directories are written, output a **chat-only summary** (no additional
+   file) containing:
+   - A side-by-side table: Stars · Downloads · License · Backing · Last release ·
+     Key strength · Key weakness
+   - A "pick A when … / pick B when …" recommendation block
+
+#### Trending repos mode
+
+For trending queries ("show me trending repos", "what's popular in Python"):
+
+- Skip the clone script entirely — use the `gh` CLI or GitHub search API directly
+  (see `analysis_guide.md §Trending Repos` for the exact commands).
+- Default parameters when unspecified: **all languages, past 7 days, top 10**.
+- Output as a ranked table in chat. **No files are written.**
+
 ### 5. Generate report files
 
 Do NOT output the full analysis as a chat message. Instead, write it as a set of structured
@@ -181,7 +232,8 @@ Every report lives under a project directory split into two language subdirector
 
 ```text
 ./reports/{owner}-{reponame}/
-├── en/          ← English originals (written first)
+├── introduction.md  ← bilingual entry point (written last, after en/ and zh/)
+├── en/              ← English originals (written first)
 │   ├── index.md
 │   ├── background.md
 │   ├── adoption.md
@@ -189,7 +241,7 @@ Every report lives under a project directory split into two language subdirector
 │   ├── momentum.md
 │   ├── risk.md
 │   └── technical.md
-└── zh/          ← Chinese translations (written second, via translate skill)
+└── zh/              ← Chinese translations (written second, via translate skill)
     ├── index.md
     ├── background.md
     ├── adoption.md
