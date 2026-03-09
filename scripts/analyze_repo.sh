@@ -648,6 +648,119 @@ cd - > /dev/null
 echo ""
 
 # ---------------------------------------------------------------
+# SECTION 8: Community Investment Signals
+# ---------------------------------------------------------------
+
+echo "### Community Investment Signals"
+echo ""
+
+echo "#### Contributor Org Diversity"
+# Fetch contributors with more details to identify org affiliations
+echo "$CONTRIB_JSON" | jq '[.[] | .login]' 2>/dev/null | jq -r '.[]' 2>/dev/null | while read -r login; do
+  USER_JSON=$(github_api "users/$login" 2>/dev/null || echo "{}")
+  COMPANY=$(echo "$USER_JSON" | jq -r '.company // "(none)"' 2>/dev/null)
+  echo "  $login: $COMPANY"
+done 2>/dev/null || echo "(could not fetch contributor orgs)"
+echo ""
+
+echo "#### External vs Internal PR Merge Time (sample)"
+# Get recent merged PRs and check if author is from the org
+echo "--- Last 20 merged PRs with author association ---"
+github_api "repos/$REPO/pulls?state=closed&sort=updated&direction=desc&per_page=20" \
+  | jq '[.[] | select(.merged_at != null) | {
+      number: .number,
+      author: .user.login,
+      author_association: .author_association,
+      created: .created_at,
+      merged: .merged_at,
+      title: (.title | if length > 60 then .[:60] + "..." else . end)
+    }]' 2>/dev/null || echo "(unavailable)"
+echo ""
+
+echo "#### Good First Issues"
+GFI_JSON=$(github_api "repos/$REPO/issues?labels=good+first+issue&state=open&per_page=10" 2>/dev/null \
+  || github_api "repos/$REPO/issues?labels=good-first-issue&state=open&per_page=10" 2>/dev/null \
+  || echo "[]")
+echo "$GFI_JSON" | jq '{
+  count: length,
+  sample: [.[:5][] | {number: .number, title: .title, created: .created_at}]
+}' 2>/dev/null || echo "(no good first issues found)"
+echo ""
+
+echo "#### CONTRIBUTING.md Content"
+if [ -f "$REPO_DIR/CONTRIBUTING.md" ]; then
+  echo "(CONTRIBUTING.md found — first 80 lines)"
+  head -80 "$REPO_DIR/CONTRIBUTING.md"
+elif [ -f "$REPO_DIR/.github/CONTRIBUTING.md" ]; then
+  echo "(.github/CONTRIBUTING.md found — first 80 lines)"
+  head -80 "$REPO_DIR/.github/CONTRIBUTING.md"
+else
+  echo "(no CONTRIBUTING.md found)"
+fi
+echo ""
+
+echo "#### GOVERNANCE.md Content"
+if [ -f "$REPO_DIR/GOVERNANCE.md" ]; then
+  echo "(GOVERNANCE.md found — first 80 lines)"
+  head -80 "$REPO_DIR/GOVERNANCE.md"
+elif [ -f "$REPO_DIR/.github/GOVERNANCE.md" ]; then
+  echo "(.github/GOVERNANCE.md found — first 80 lines)"
+  head -80 "$REPO_DIR/.github/GOVERNANCE.md"
+else
+  echo "(no GOVERNANCE.md found)"
+fi
+echo ""
+
+echo "#### MAINTAINERS / CODEOWNERS"
+for f in MAINTAINERS MAINTAINERS.md .github/CODEOWNERS CODEOWNERS; do
+  if [ -f "$REPO_DIR/$f" ]; then
+    echo "(found: $f)"
+    cat "$REPO_DIR/$f"
+    echo ""
+  fi
+done
+echo ""
+
+echo "#### Community Meeting / Communication Links"
+# Search README and docs for community meeting references
+if [ -n "$README" ]; then
+  echo "--- Community/meeting references in README ---"
+  grep -iE "(community meeting|office hours|slack|discord|mailing list|forum|gitter|matrix|zulip|discuss)" \
+    "$README" 2>/dev/null | head -15 || echo "(none found)"
+fi
+echo ""
+
+echo "#### CLA / DCO Requirements"
+# Check for CLA or DCO mentions
+CLA_FOUND=false
+for f in CLA.md .github/CLA.md DCO .github/DCO; do
+  if [ -f "$REPO_DIR/$f" ]; then
+    echo "(found: $f)"
+    head -20 "$REPO_DIR/$f"
+    CLA_FOUND=true
+    echo ""
+  fi
+done
+if [ "$CLA_FOUND" = false ]; then
+  # Check CONTRIBUTING.md for CLA/DCO mentions
+  for f in CONTRIBUTING.md .github/CONTRIBUTING.md; do
+    if [ -f "$REPO_DIR/$f" ]; then
+      grep -iE "(CLA|DCO|contributor license|developer certificate|sign.off)" \
+        "$REPO_DIR/$f" 2>/dev/null | head -5
+    fi
+  done
+fi
+echo ""
+
+echo "#### PR Review Culture (sample)"
+# Get comments from recent PRs to gauge review culture
+echo "--- Recent PR review comments sample (last 5 PRs) ---"
+github_api "repos/$REPO/pulls?state=closed&sort=updated&direction=desc&per_page=5" \
+  | jq '[.[] | {number: .number, review_comments: .review_comments, comments: .comments}]' \
+  2>/dev/null || echo "(unavailable)"
+echo ""
+
+# ---------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------
 

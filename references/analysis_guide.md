@@ -12,9 +12,10 @@
 5. [Momentum & Trajectory](#momentum)
 6. [Risk Assessment](#risk)
 7. [Technical Deep-Dive](#technical)
-8. [Trending Repos](#trending)
-9. [Handling Missing Data](#missing-data)
-10. [Analysis Depth by Mode](#depth-by-mode)
+8. [Community Investment Assessment](#investment)
+9. [Trending Repos](#trending)
+10. [Handling Missing Data](#missing-data)
+11. [Analysis Depth by Mode](#depth-by-mode)
 
 ---
 
@@ -28,9 +29,12 @@ even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 ```markdown
 ## Decision Brief: <Project Name>
 
-**Verdict**: Adopt ✅ | Evaluate ⚠️ | Avoid ❌
+**Adoption Verdict**: Adopt ✅ | Evaluate ⚠️ | Avoid ❌
+**Investment Verdict**: Invest 🟢 | Explore 🟡 | Watch 👀 | Skip ⛔
 
 **One-line summary**: [What it does and who it's for]
+
+### Adoption Signals
 
 | Signal | Status |
 |--------|--------|
@@ -41,20 +45,43 @@ even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 | Bus factor | [Low (<3 key devs) / Medium / High] |
 | Breaking-change risk | [Low / Medium / High] |
 
+### Community Investment Signals
+
+| Signal | Status |
+|--------|--------|
+| Strategic alignment | [Core / Related / Peripheral] — how closely the project relates to our business |
+| Community openness | [Open / Semi-open / Closed] — can external contributors gain real influence? |
+| Entry barrier | [Low / Medium / High] — how hard to start contributing meaningfully |
+| Competitor presence | [Deep / Moderate / None] — are competitors already influencing the project? |
+| Influence ceiling | [Maintainer possible / Committer possible / Contributor only / No path] |
+| Estimated ROI timeline | [3 months / 6 months / 1 year+] — time to meaningful community presence |
+
 **Best suited for**: [specific use cases where this project excels]
 **Not suited for**: [anti-patterns or scenarios to avoid]
 **Key risk**: [the single most important concern]
 **Primary alternative**: [best competing option with one-line rationale]
 **Recommended next step**: [POC / wait for vX.Y / adopt now / keep watching]
+**Community investment recommendation**: [Invest N FTEs / Explore with 1 contributor / Watch only / Skip]
 ```
 
 ### Verdict criteria
+
+### Adoption verdict criteria
 
 | Verdict | Signals |
 |---------|---------|
 | **Adopt ✅** | Backed by org or foundation · mainstream adoption · active maintenance · permissive license · low bus factor |
 | **Evaluate ⚠️** | Some concerns present but manageable · promising but early · narrow adoption · non-trivial license |
 | **Avoid ❌** | Abandoned / archived · copyleft license conflicts · critical bus factor risk · major security history · losing to competitor |
+
+### Investment verdict criteria
+
+| Verdict | Signals |
+|---------|---------|
+| **Invest 🟢** | High strategic alignment · open governance · clear path to maintainer · competitors already present · external PR merge < 2 weeks |
+| **Explore 🟡** | Moderate alignment · semi-open governance · some entry barriers · worth testing with 1 contributor for 3 months |
+| **Watch 👀** | Low alignment or early-stage project · keep tracking but don't commit people yet |
+| **Skip ⛔** | Closed governance (single-company controlled) · no path to influence · project declining · no strategic relevance |
 
 ---
 
@@ -130,9 +157,20 @@ relationship between the OSS project and any commercial entity.]
 | Acquisition / pivot / shutdown risk | [Low / Medium / High — rationale] |
 | Community independence | [Would the project survive if the primary backer stepped away?] |
 
+## Governance Openness (for community investment)
+
+| Signal | Assessment |
+|--------|------------|
+| External maintainer path | [Exists / Informal / None — evidence] |
+| Decision transparency | [Public RFCs / Roadmap published / Opaque] |
+| PR acceptance for externals | [Equal treatment / Slower / Gatekept — evidence from PR data] |
+| Community meeting cadence | [Weekly / Monthly / None — link if available] |
+| CLA/DCO requirement | [None / DCO / CLA — which provider] |
+
 ## Summary
 
-[1 paragraph synthesis of organizational health and long-term viability outlook]
+[1 paragraph synthesis of organizational health and long-term viability outlook,
+including assessment of whether external contributors can gain meaningful influence.]
 ```
 
 ---
@@ -244,6 +282,15 @@ conference talks, case studies).]
 
 [Managed services, first-party cloud integrations, or "none — library only".]
 
+## Contributor Landscape
+
+| Metric | Value | Interpretation |
+|--------|-------|---------------|
+| External contributor ratio | N% | [proportion of contributors NOT from the backing org] |
+| External PR merge time (median) | N days | [vs internal PR merge time if available] |
+| Companies contributing | [list of orgs with active contributors] |
+| Our industry peers contributing | [which companies from our sector are already involved] |
+
 ## Adoption Assessment
 
 | Dimension | Signal |
@@ -300,6 +347,21 @@ Classify the project's position:
 | **Niche specialist** | Narrow use case, best-in-class for that case |
 | **Early mover** | First to solve a new problem, but market not yet formed |
 | **Legacy** | Was once dominant, now losing ground to newer alternatives |
+
+### Community investment comparison
+
+For each alternative, assess the community investment opportunity:
+
+```markdown
+| Dimension | <This Project> | <Alt 1> | <Alt 2> |
+|-----------|---------------|---------|---------|
+| Governance openness | [Open / Semi-open / Closed] | ... | ... |
+| External contributor % | N% | N% | N% |
+| Path to maintainer | [Yes / No] | ... | ... |
+| Community meeting | [Yes — cadence] | ... | ... |
+| Good first issues | N open | N open | N open |
+| Strategic value of influence | [High / Medium / Low] | ... | ... |
+```
 
 ### When to pick this over alternatives
 
@@ -405,6 +467,9 @@ If only bug fixes, state "maintenance mode" explicitly.]
 | Total contributors | N |
 | New contributors (last 6 months) | N |
 | Top contributor share | N% of commits |
+| External contributor ratio | N% (non-backing-org contributors) |
+| External contributor trend | [Growing / Stable / Shrinking] |
+| Org diversity (contributors from N+ orgs) | N organizations |
 
 ## Media & Community Signals
 
@@ -475,6 +540,20 @@ Check these explicitly:
 - [ ] Maintainer publicly announced stepping back or seeking new owners?
 - [ ] Repo explicitly archived?
 - [ ] No release in 12+ months despite open bugs?
+
+### Community Investment Risk
+
+Risks specific to investing team resources into community participation:
+
+| Risk | Signal | Mitigation |
+|------|--------|-----------|
+| **Wasted effort** | Project acquired/relicensed/abandoned after investment | Check backing stability in background.md |
+| **Closed governance** | >90% commits from one org; no external maintainers | Verify governance openness before investing |
+| **Community fork** | Contentious governance changes; license disputes | Check for community tension signals |
+| **Competitor capture** | Competitor already dominates maintainer seats | Assess whether influence is still achievable |
+| **Strategic pivot** | Project roadmap diverges from our needs | Monitor roadmap alignment quarterly |
+
+---
 
 ### License Risk
 
@@ -711,6 +790,196 @@ Reference table of red flags:
 
 ---
 
+## Community Investment Assessment <a name="investment"></a>
+
+> **Written to**: `investment.md`
+
+**Goal**: Help decision-makers evaluate whether investing team resources (FTEs, time, focus)
+into community participation will generate meaningful returns — in technical influence,
+employer branding, risk mitigation, or business opportunities.
+
+---
+
+### 1. Strategic Value Assessment
+
+**Goal**: Determine how closely the project aligns with business strategy and what
+participating in the community would unlock.
+
+| Question | How to assess |
+|----------|--------------|
+| How critical is this project to our tech stack? | Check dependency graph, usage in production |
+| Could community influence steer the project favorably? | Review roadmap, open RFCs, feature requests |
+| Are competitors already influencing direction? | Check maintainer affiliations, PR authors |
+| What business opportunities could community presence unlock? | Partnerships, customer trust, talent pipeline |
+
+**Strategic alignment classification**:
+
+| Level | Description | Implication |
+|-------|-------------|-------------|
+| **Core** | Project is in our critical path; downtime or breaking changes directly impact revenue | Must invest — being a passive consumer of critical infra is a risk |
+| **Related** | Project is adjacent to our business; influence would create competitive advantage | Should explore — calculate ROI before committing headcount |
+| **Peripheral** | Project is useful but substitutable; no strategic leverage from community presence | Watch only — redirect investment to Core/Related projects |
+
+---
+
+### 2. Community Openness Assessment
+
+**Goal**: Determine whether external contributors can actually gain influence, or if the
+community is effectively closed despite being "open source."
+
+**Key indicators** (from script output and manual inspection):
+
+| Signal | Open (good for investment) | Closed (bad for investment) |
+|--------|--------------------------|---------------------------|
+| External contributor ratio | >30% commits from non-backing-org | <10% external commits |
+| External PR merge time | Similar to internal PRs (<2 weeks) | Significantly slower (>1 month) |
+| Maintainer/committer diversity | Maintainers from 3+ organizations | All maintainers from one company |
+| Governance documentation | GOVERNANCE.md with clear promotion path | No governance docs; decisions opaque |
+| Community meetings | Regular, open, recorded | None, or internal-only |
+| RFC/proposal process | Public proposals; external input welcomed | Closed roadmap; features appear without discussion |
+| Good first issues | >10 open, recently tagged | None, or stale |
+
+**Openness classification**:
+
+| Level | Signals |
+|-------|---------|
+| **Open** | External maintainers exist · public governance · equal PR treatment · regular community meetings |
+| **Semi-open** | Contributions welcome but influence limited · no external maintainers · roadmap set internally |
+| **Closed** | >90% internal commits · PRs from externals languish · effectively a company project with an OSS license |
+
+---
+
+### 3. Entry Barrier Assessment
+
+**Goal**: Estimate how much effort is needed before a new contributor can make meaningful
+contributions.
+
+| Factor | Low barrier | High barrier |
+|--------|-----------|-------------|
+| CONTRIBUTING.md | Clear, detailed, up-to-date | Missing or outdated |
+| Good first issues | >10 open, recently created | None available |
+| Dev environment setup | Works in <30 min | Complex dependencies, special hardware, flaky setup |
+| Code review culture | Constructive, timely feedback | Hostile, nitpicky, or no response |
+| Required tech stack | Matches our team's skills | Requires significant new learning |
+| CLA/DCO process | None or simple DCO | Complex CLA with legal review |
+| Test infrastructure | Easy to run locally | Requires special infra (GPUs, cloud accounts) |
+| Documentation quality | Architecture docs, code comments | Tribal knowledge only |
+
+**Barrier classification**:
+
+| Level | Estimated ramp-up time |
+|-------|----------------------|
+| **Low** | First meaningful PR in 1-2 weeks |
+| **Medium** | First meaningful PR in 1-2 months |
+| **High** | First meaningful PR in 3+ months; requires dedicated learning investment |
+
+---
+
+### 4. Investment Cost Estimation
+
+**Goal**: Give the decision-maker a realistic resource commitment estimate.
+
+```markdown
+| Cost dimension | Estimate | Basis |
+|---------------|---------|-------|
+| Ramp-up time per contributor | [1-2 weeks / 1-2 months / 3+ months] | Barrier assessment above |
+| Minimum FTE to sustain presence | [0.2 / 0.5 / 1.0 FTE] | Based on community activity level and PR cadence |
+| Time to committer/maintainer status | [6 months / 1 year / 2+ years / unlikely] | Based on governance model and historical promotions |
+| Required skill set | [list of key technologies] | From tech stack analysis |
+| Timezone cost | [Low / Medium / High] | Core maintainer active hours vs. our team's timezone |
+| Ongoing maintenance burden | [attend meetings / review PRs / maintain modules] | Based on expected involvement level |
+```
+
+---
+
+### 5. Expected Returns
+
+**Goal**: Map concrete returns the organization can expect from community investment.
+
+| Return type | Potential | How to measure success |
+|-------------|----------|----------------------|
+| **Technical influence** | Steer roadmap, prioritize our use cases, prevent unfavorable changes | Features aligned with our needs ship; breaking changes affecting us are caught early |
+| **Risk mitigation** | Deep understanding of internals; ability to patch/fork if needed; early warning of issues | Reduced incident response time; proactive migration before breaking changes |
+| **Employer branding** | Visibility in the community; attract engineers who want to work on this project | Candidate pipeline mentions our OSS contributions; conference speaking invitations |
+| **Team growth** | Engineers level up through exposure to world-class codebases and review standards | Measurable skill improvement; knowledge sharing within the team |
+| **Business opportunities** | Customer trust ("we contribute to X"); partnership with project's commercial entity | New customer conversations; co-marketing with project sponsor |
+| **Ecosystem intelligence** | Early access to roadmap; understanding of competitor moves via community interactions | Strategic decisions informed by community insider knowledge |
+
+---
+
+### 6. Output Template
+
+```markdown
+# Community Investment Assessment — {Project Name}
+
+> **Source**: {github-url} | **Analyzed**: {YYYY-MM-DD}
+
+## Investment Verdict: **[Invest 🟢 / Explore 🟡 / Watch 👀 / Skip ⛔]**
+
+[1-2 sentence rationale for the verdict]
+
+## Strategic Value
+
+| Dimension | Assessment |
+|-----------|------------|
+| Strategic alignment | [Core / Related / Peripheral] — [rationale] |
+| Business criticality | [Critical path / Important / Nice-to-have] |
+| Competitor community presence | [company names and their involvement level] |
+| Influence opportunity | [What we could realistically influence and why it matters] |
+
+## Community Openness
+
+| Signal | Value | Assessment |
+|--------|-------|------------|
+| External contributor ratio | N% | [Open / Semi-open / Closed] |
+| External vs internal PR merge time | N days vs N days | [Equal / Slower / Much slower] |
+| Maintainer org diversity | N organizations | [Diverse / Concentrated / Single-org] |
+| Governance docs | [Present / Absent] | [Clear promotion path / No path documented] |
+| Community meetings | [Frequency + open/closed] | [Accessible / Not accessible] |
+| Good first issues | N open (last tagged: date) | [Welcoming / Not welcoming] |
+
+## Entry Barriers
+
+| Factor | Status | Impact |
+|--------|--------|--------|
+| CONTRIBUTING.md quality | [Good / Adequate / Poor / Missing] | ... |
+| Dev environment setup | [Easy / Moderate / Complex] | ... |
+| Required skills match | [Strong match / Partial / Gap] | [gap details if any] |
+| Code review culture | [Constructive / Neutral / Hostile] | ... |
+| CLA/DCO requirement | [None / DCO / CLA] | ... |
+
+**Overall entry barrier**: [Low / Medium / High]
+**Estimated ramp-up**: [time for first meaningful contribution]
+
+## Investment Cost Estimate
+
+| Resource | Estimate |
+|----------|---------|
+| Minimum FTE commitment | [N FTE] |
+| Ramp-up period | [N weeks/months] |
+| Timeline to meaningful influence | [N months] |
+| Required skills | [list] |
+| Timezone alignment | [Good / Moderate / Poor — rationale] |
+
+## Expected Returns
+
+| Return | Likelihood | Timeline | Value |
+|--------|-----------|----------|-------|
+| Technical influence on roadmap | [High / Medium / Low] | [N months] | [what specifically] |
+| Risk mitigation | [High / Medium / Low] | [immediate / N months] | [what specifically] |
+| Employer branding | [High / Medium / Low] | [N months] | [what specifically] |
+| Team skill development | [High / Medium / Low] | [immediate] | [what specifically] |
+| Business opportunities | [High / Medium / Low] | [N months] | [what specifically] |
+
+## Recommendation
+
+[2-3 paragraphs: synthesize the assessment into an actionable recommendation.
+Include: recommended commitment level, specific first steps, success criteria,
+and timeline for re-evaluation.]
+```
+
+---
+
 ## Trending Repos <a name="trending"></a>
 
 > **Written to**: chat response only (no file — trending results are ephemeral)
@@ -763,8 +1032,9 @@ rather than the full-report standard:
 
 | Mode | Files written | Depth standard |
 |------|--------------|----------------|
-| Full report (default) | All 7 + introduction.md | All subsections at maximum depth; all templates filled |
-| Single section (e.g., "just the risk") | That one dimension file + index.md | Dimension file at full depth; index.md with Decision Brief only; other 5 files skipped |
+| Full report (default) | All 8 + introduction.md | All subsections at maximum depth; all templates filled |
+| Single section (e.g., "just the risk") | That one dimension file + index.md | Dimension file at full depth; index.md with Decision Brief only; other 6 files skipped |
+| Investment focus ("should we contribute?") | investment.md + index.md | Investment at full depth; index.md with both verdicts; other files skipped |
 | Quick overview ("should I adopt X?") | index.md only | Decision Brief + Key Metrics + one-sentence summaries; target ≤ 1 page |
 | Compare mode (X vs Y) | Full reports for both + chat summary | No depth reduction |
 | Trending repos | Chat table only | No files written |
@@ -778,4 +1048,5 @@ with `[not generated]` in place of a file link:
 |---------|---------|------|
 | Organizational Background | [one sentence] | *not generated* |
 | Real-World Adoption | [one sentence] | *not generated* |
+| Community Investment | [one sentence] | *not generated* |
 ```

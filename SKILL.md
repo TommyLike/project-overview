@@ -11,21 +11,26 @@ description: >
   (5) adoption risk assessment (security, bus factor, breaking changes),
   (6) a final decision brief with a clear adopt/evaluate/avoid recommendation,
   (7) technical deep-dive: architecture, core concepts, key components, papers, docs links,
-  (8) trending GitHub repositories by language or time period.
+  (8) trending GitHub repositories by language or time period,
+  (9) community investment assessment: entry barriers, contributor experience, governance openness,
+  (10) investment ROI analysis: strategic value, cost estimation, expected returns.
   Triggers on: "analyze this GitHub repo", "should we adopt X", "compare X vs Y",
   "is X still maintained", "what's the risk of using X", "how popular is X",
   "explain this project", "how do I get started with X", "show me trending repos",
-  "review this codebase", "is X backed by a company".
+  "review this codebase", "is X backed by a company",
+  "should we contribute to X", "is it worth investing in X community",
+  "how open is X's community", "can we influence X's roadmap".
 ---
 
 # GitHub Project Analyzer
 
 ## Target Audience
 
-This skill has **one audience: the decision-maker** (CTO, tech lead, architect, or anyone
-evaluating whether to adopt a project). Every section — including technical architecture,
-papers, and getting started — is written to help a decision-maker form a complete picture,
-not to serve developers looking for implementation details.
+This skill has **one audience: the decision-maker** (CTO, tech lead, team manager, architect,
+or anyone evaluating whether to adopt a project **and/or invest resources into its community**).
+Every section is written to help a decision-maker form a complete picture — not just "should
+we use this?" but also "should we invest people into contributing to this community, and
+what's the expected return?"
 
 ---
 
@@ -177,7 +182,7 @@ rm -rf <TEMP_DIR>
 
 | User asks | Focus section(s) |
 |-----------|----------------|
-| "Analyze X" / "full report on X" | All 7 files (default) |
+| "Analyze X" / "full report on X" | All 8 files (default) |
 | "Should we adopt X?" / "evaluate X" | index.md §Decision Brief |
 | "Who backs X?" / "is it corporate?" | background.md |
 | "How widely used is X?" | adoption.md |
@@ -187,12 +192,14 @@ rm -rf <TEMP_DIR>
 | "How does X work?" / "architecture?" / "key concepts?" | technical.md §1–3 |
 | "Any papers?" / "research behind X?" / "docs?" | technical.md §4–5 |
 | "How do I try it?" / "quick start?" | technical.md §6 |
+| "Should we contribute to X?" / "invest in X community?" | investment.md + index.md |
+| "How open is X's community?" | investment.md §Community Openness |
 | "Trending repos" / "what's popular" | Chat only — no files written |
 
 Read `references/analysis_guide.md` for detailed guidance on each section.
 
 **Default behavior**: If user intent is unspecified, always produce the **full report** —
-all 7 files. Every section contributes to a complete decision-maker picture.
+all 8 files. Every section contributes to a complete decision-maker picture.
 
 #### Compare mode (X vs Y)
 
@@ -240,7 +247,8 @@ Every report lives under a project directory split into two language subdirector
 │   ├── competitive.md
 │   ├── momentum.md
 │   ├── risk.md
-│   └── technical.md
+│   ├── technical.md
+│   └── investment.md
 └── zh/              ← Chinese translations (written second, via translate skill)
     ├── index.md
     ├── background.md
@@ -248,7 +256,8 @@ Every report lives under a project directory split into two language subdirector
     ├── competitive.md
     ├── momentum.md
     ├── risk.md
-    └── technical.md
+    ├── technical.md
+    └── investment.md
 ```
 
 Example: analyzing `vllm-project/llm-compressor` →
@@ -266,11 +275,12 @@ Example: analyzing `vllm-project/llm-compressor` →
 | `momentum.md` | Star velocity, release cadence, PR/issue health, lifecycle stage |
 | `risk.md` | Bus factor, security, breaking-change history, abandonment signals, license |
 | `technical.md` | Core concepts · Architecture · Key components · Papers · Docs links · Hello World · Code quality |
+| `investment.md` | Community investment assessment: strategic value · entry barriers · cost estimation · expected returns · governance openness |
 
 #### Step 5a — Write English report (`en/`)
 
-Write all 7 files to the `en/` subdirectory. Order: **6 dimension files first**
-(background → adoption → competitive → momentum → risk → technical), then `index.md` last.
+Write all 8 files to the `en/` subdirectory. Order: **7 dimension files first**
+(background → adoption → competitive → momentum → risk → technical → investment), then `index.md` last.
 
 Use the **Write** tool for every file. Parent directories are created automatically.
 
@@ -292,6 +302,9 @@ Use the **Write** tool for every file. Parent directories are created automatica
 | Backed by | ... |
 | Last pushed | ... |
 | GitHub dependents | ... |
+| External contributor ratio | ... |
+| External PR merge time (median) | ... |
+| Good first issues (open) | ... |
 
 ## Contents
 | Section | Summary | File |
@@ -302,15 +315,16 @@ Use the **Write** tool for every file. Parent directories are created automatica
 | Momentum & Trajectory | [one sentence] | [momentum.md](./momentum.md) |
 | Risk Assessment | [one sentence] | [risk.md](./risk.md) |
 | Technical Details | [one sentence] | [technical.md](./technical.md) |
+| Community Investment | [one sentence] | [investment.md](./investment.md) |
 ```
 
 #### Step 5b — Translate to Chinese (`zh/`) via `translate` skill
 
-After all 7 English files are written, **always** invoke the `translate` skill to produce
+After all 8 English files are written, **always** invoke the `translate` skill to produce
 the Chinese version. This is not optional — both language versions are always generated.
 
-**For each of the 7 files**, in the same order (background → adoption → competitive →
-momentum → risk → technical → index):
+**For each of the 8 files**, in the same order (background → adoption → competitive →
+momentum → risk → technical → investment → index):
 
 1. Read the English file from `en/<file>.md`.
 2. Invoke the `translate` skill with the following parameters:
