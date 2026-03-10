@@ -36,43 +36,79 @@ what's the expected return?"
 
 ## Dependencies
 
-This skill requires two companion skills to be installed and available. Each one is
+This skill requires companion skills to be installed and available. Each one is
 invoked automatically during analysis:
 
 | Skill | When used | What happens without it |
 |-------|-----------|------------------------|
 | `read-arxiv-paper` | **technical.md §Research & Papers** — when the project links to arXiv/DOI papers, this skill is invoked to produce a structured paper summary instead of a bare URL | Papers are listed as plain links only; no summary or key-takeaways |
-| `translate` | **On demand** — when the user requests the report (or a section) in a language other than English | Output is English only; translation requests cannot be fulfilled |
+| `translate` | **Phase 3b** — translates all 8 English report files to Chinese (`zh/`) | Output is English only; Chinese translation cannot be fulfilled |
+| `document-skills:pdf` | **Phase 4** — generates a PDF report from Chinese markdown files | PDF generation unavailable; Phase 4 must be skipped |
+| `document-skills:pptx` | **Phase 5** — generates a PPTX slide deck from Chinese markdown files | PPTX generation unavailable; Phase 5 must be skipped |
+
+`document-skills:pdf` and `document-skills:pptx` are **optional** — only checked if the user requests
+PDF/PPTX output (see Pre-execution Consultation below).
 
 **Installation**: Skills are installed via Claude Code settings or the skill marketplace.
-If a skill is missing, the dependency check (Step 0 below) will tell the user exactly
+If a skill is missing, the dependency check (Phase 0 below) will tell the user exactly
 what to install before analysis begins.
 
 ---
 
 ## Workflow
 
-The workflow has **three explicit phases**. Each phase persists its output locally so that
+The workflow has **five explicit phases**. Each phase persists its output locally so that
 re-runs skip completed work and reduce API calls and token usage.
 
 ```
-Phase 0: Dependency check
+Phase 0: Dependency check  +  Pre-execution consultation (PDF / PPTX preference)
 Phase 1: Data Collection   →  saves to ./cache/{owner}-{repo}/raw/
 Phase 2: Analysis          →  saves to ./cache/{owner}-{repo}/analysis/
-Phase 3: Report Generation →  writes to ./reports/{owner}-{repo}/
+Phase 3: Report Generation →  writes to ./reports/{owner}-{repo}/  (en/ + zh/ + introduction.md)
+Phase 4: PDF Generation    →  ./reports/{owner}-{repo}/report_zh.pdf   [optional, independent]
+Phase 5: PPTX Generation   →  ./reports/{owner}-{repo}/slides_zh.pptx  [optional, independent]
 ```
+
+Phases 4 and 5 are **independent** of each other and of Phase 3 — each can be re-run
+individually after a failure without re-running the others.
 
 ---
 
-### Phase 0 — Dependency Check
+### Phase 0 — Dependency Check + Pre-execution Consultation
 
-Before cloning the repo or calling any API, check whether both required skills are
-available in the current session.
+#### Step 0a — Pre-execution consultation
 
-**How to check**: Look at the list of available skills shown in your system context
-(the `Skill` tool description). Both `translate` and `read-arxiv-paper` must appear.
+**Before checking any skills or running any analysis**, ask the user:
 
-**For each missing skill**, stop and tell the user:
+```text
+分析完成后是否需要生成以下格式的报告？（均由中文版 markdown 生成）
+
+  [1] PDF 格式报告（report_zh.pdf）
+  [2] PPT 格式幻灯片（slides_zh.pptx）
+  [3] 两者都需要
+  [4] 都不需要（仅生成 markdown 报告）
+
+请回复编号或直接说明需求。
+```
+
+Record the user's answer as **`WANT_PDF`** (true/false) and **`WANT_PPTX`** (true/false).
+These flags control which dependencies to check and which phases to execute.
+
+**Skip this question** if:
+- The user's original request already specified PDF/PPTX (e.g., "生成报告并导出PDF")
+- The user is re-running a failed Phase 4 or Phase 5 directly
+
+#### Step 0b — Required dependency check
+
+Check whether the **always-required** skills are available (look in the `Skill` tool
+description in your system context):
+
+| Skill | Required for | Install command |
+|-------|-------------|----------------|
+| `read-arxiv-paper` | Phase 1 (paper summaries) | `npx skills add https://github.com/sunqb/ccsdk --skill read-arxiv-paper` |
+| `translate` | Phase 3b (Chinese translation) | `npx skills add https://github.com/sunqb/ccsdk --skill translate` |
+
+**For each missing required skill**, stop and tell the user:
 
 ```text
 ⚠️  Missing dependency: the `<skill-name>` skill is not installed.
@@ -85,14 +121,36 @@ Install it with:
 Once installed, restart the session and try again.
 ```
 
-| Skill | Install command |
-|-------|----------------|
-| `read-arxiv-paper` | `npx skills add https://github.com/sunqb/ccsdk --skill read-arxiv-paper` |
-| `translate` | `npx skills add https://github.com/sunqb/ccsdk --skill translate` |
-
-**Degraded-mode exception**: If the user explicitly says "proceed anyway / 继续":
+**Degraded-mode exception** (user says "proceed anyway / 继续"):
 - Missing `read-arxiv-paper` → list paper URLs only; add `> ⚠️ read-arxiv-paper skill not installed.`
 - Missing `translate` → English only; add `> ⚠️ translate skill not installed — English only.`
+
+#### Step 0c — Optional dependency check (PDF / PPTX)
+
+Only perform this check if `WANT_PDF=true` or `WANT_PPTX=true`:
+
+| Flag | Skill needed | Install command |
+|------|-------------|----------------|
+| `WANT_PDF=true` | `document-skills:pdf` | `npx skills add https://github.com/sunqb/ccsdk --skill document-skills:pdf` |
+| `WANT_PPTX=true` | `document-skills:pptx` | `npx skills add https://github.com/sunqb/ccsdk --skill document-skills:pptx` |
+
+If a required optional skill is missing:
+
+```text
+⚠️  Missing dependency: the `<skill-name>` skill is not installed.
+
+This skill is needed to generate <PDF/PPTX> output (Phase <4/5>).
+
+Install it with:
+  npx skills add https://github.com/sunqb/ccsdk --skill <skill-name>
+
+You can:
+  [1] Install it now, then restart the session and re-run
+  [2] Skip <PDF/PPTX> generation and continue with markdown only
+  [3] Run Phases 1–3 now, then install the skill later and run Phase <4/5> separately
+```
+
+If the user chooses option [2] or [3], set the corresponding flag to false and continue.
 
 ---
 
@@ -440,14 +498,129 @@ After both `en/` and `zh/` are complete, write the entry-point file:
 
 Tell the user:
 ```text
-报告已生成：
+Markdown 报告已生成：
   入口：  ./reports/{owner}-{reponame}/introduction.md
   英文版：./reports/{owner}-{reponame}/en/index.md
   中文版：./reports/{owner}-{reponame}/zh/index.md
   缓存：  ./cache/{owner}-{reponame}/
 ```
 
+Then proceed to Phase 4 and/or Phase 5 if the user requested PDF/PPTX.
+
 Do NOT repeat the full report in chat. A brief 3-5 sentence summary is sufficient.
+
+---
+
+### Phase 4 — PDF Generation (optional, independent)
+
+**Prerequisite**: `WANT_PDF=true` AND `document-skills:pdf` skill is installed.
+**Skip entirely** if `WANT_PDF=false`.
+
+**Re-run behavior**: Phase 4 is independent — it can be re-run after a failure without
+re-running Phases 1–3. If `report_zh.pdf` already exists and none of the `zh/*.md` files
+are newer than the PDF, ask the user whether to regenerate.
+
+**Source files** (in order):
+
+```text
+./reports/{owner}-{reponame}/zh/index.md
+./reports/{owner}-{reponame}/zh/background.md
+./reports/{owner}-{reponame}/zh/adoption.md
+./reports/{owner}-{reponame}/zh/competitive.md
+./reports/{owner}-{reponame}/zh/momentum.md
+./reports/{owner}-{reponame}/zh/risk.md
+./reports/{owner}-{reponame}/zh/technical.md
+./reports/{owner}-{reponame}/zh/investment.md
+```
+
+**Output file**: `./reports/{owner}-{reponame}/report_zh.pdf`
+
+**Execution**:
+
+1. Verify all 8 source `zh/*.md` files exist. If any are missing, tell the user to run
+   Phase 3 first.
+2. Invoke the `document-skills:pdf` skill with the ordered list of source files and the output path.
+3. On success, confirm to the user:
+   ```text
+   ✅ PDF 已生成：./reports/{owner}-{reponame}/report_zh.pdf
+   ```
+4. On failure, tell the user:
+   ```text
+   ❌ PDF 生成失败：<error message>
+
+   排查建议：
+   - 确认 document-skills:pdf skill 已正确安装
+   - 检查源文件是否存在：./reports/{owner}-{reponame}/zh/
+   - 重新运行 Phase 4：直接告诉我"重新生成 PDF"即可，无需重新运行整个分析
+   ```
+
+---
+
+### Phase 5 — PPTX Generation (optional, independent)
+
+**Prerequisite**: `WANT_PPTX=true` AND `document-skills:pptx` skill is installed.
+**Skip entirely** if `WANT_PPTX=false`.
+
+**Re-run behavior**: Phase 5 is independent — it can be re-run after a failure without
+re-running Phases 1–4. If `slides_zh.pptx` already exists and none of the `zh/*.md` files
+are newer than the PPTX, ask the user whether to regenerate.
+
+**Source files** and **slide mapping**:
+
+| Source file | Slide group | Notes |
+|-------------|-------------|-------|
+| `zh/index.md` | Cover + Decision Brief | Decision Brief → 2–3 summary slides |
+| `zh/background.md` | Organizational Background | 1–2 slides |
+| `zh/adoption.md` | Real-World Adoption | 1–2 slides |
+| `zh/competitive.md` | Competitive Landscape | 1–2 slides (keep comparison table) |
+| `zh/momentum.md` | Momentum & Trajectory | 1 slide |
+| `zh/risk.md` | Risk Assessment | 1–2 slides |
+| `zh/technical.md` | Technical Details | 2–3 slides |
+| `zh/investment.md` | Community Investment | 2–3 slides (keep cost/return tables) |
+
+**Output file**: `./reports/{owner}-{reponame}/slides_zh.pptx`
+
+**Execution**:
+
+1. Verify all 8 source `zh/*.md` files exist. If any are missing, tell the user to run
+   Phase 3 first.
+2. Invoke the `document-skills:pptx` skill with the ordered source files, slide mapping hints,
+   and the output path.
+3. On success, confirm to the user:
+   ```text
+   ✅ PPT 已生成：./reports/{owner}-{reponame}/slides_zh.pptx
+   ```
+4. On failure, tell the user:
+   ```text
+   ❌ PPT 生成失败：<error message>
+
+   排查建议：
+   - 确认 document-skills:pptx skill 已正确安装
+   - 检查源文件是否存在：./reports/{owner}-{reponame}/zh/
+   - 重新运行 Phase 5：直接告诉我"重新生成 PPT"即可，无需重新运行整个分析
+   ```
+
+---
+
+#### After all requested phases complete
+
+Tell the user a final summary of everything generated:
+
+```text
+分析报告已全部生成：
+
+  📄 Markdown 报告
+     入口：      ./reports/{owner}-{reponame}/introduction.md
+     英文版：    ./reports/{owner}-{reponame}/en/index.md
+     中文版：    ./reports/{owner}-{reponame}/zh/index.md
+
+  📑 PDF 报告    ./reports/{owner}-{reponame}/report_zh.pdf       ✅ / ⏭️ 跳过
+  📊 PPT 幻灯片  ./reports/{owner}-{reponame}/slides_zh.pptx      ✅ / ⏭️ 跳过
+
+  缓存目录：      ./cache/{owner}-{reponame}/
+```
+
+If a phase failed, show `❌ 失败` and remind the user they can retry that phase alone.
 
 ---
 
