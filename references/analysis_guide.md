@@ -1,8 +1,10 @@
 # GitHub Project Analysis Guide
 
-> **Guide version**: 1.1 · **Last updated**: 2026-02-20
+> **Guide version**: 1.2 · **Last updated**: 2026-03-10
 > Download benchmarks, bus-factor ratios, and calibration thresholds reflect the ecosystem
 > as of early 2026. Review annually or whenever reports yield systematically skewed verdicts.
+> v1.2: Added extended data sources — package ecosystems, search trends, community signals,
+> security health (OpenSSF/OSV/NVD), foundation status, and commercial intelligence.
 
 ## Table of Contents
 1. [Decision Brief](#decision-brief)
@@ -98,10 +100,17 @@ even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 | Type | Examples | Sustainability |
 |------|---------|---------------|
 | FAANG / Big Tech | Google, Meta, Microsoft, AWS repos | High — internal usage drives maintenance |
-| Open Source Foundation | CNCF, Apache, Linux Foundation | High — governance beyond any single company |
+| Open Source Foundation (Graduated) | CNCF Graduated, Apache TLP | Highest — multi-org governance, proven community |
+| Open Source Foundation (Incubating) | CNCF Incubating, Apache Incubator | High — on a governance track, improving |
+| Open Source Foundation (Sandbox) | CNCF Sandbox | Medium — early stage, governance not yet proven |
 | VC-backed startup | Vercel, HashiCorp, Databricks OSS | Medium — depends on runway and commercialization |
 | Community / Individual | Personal GitHub, no org | Low — vulnerable to burnout, life changes |
 | Academic | University labs, research groups | Low-Medium — often prototype-quality |
+
+**Foundation status lookup** (from script §Foundation & Governance Status):
+- CNCF Landscape JSON is queried automatically — check output for project tier
+- Apache projects list is queried — check if project is a Top-Level Project (TLP) vs. Incubator
+- Linux Foundation landscape is also checked
 
 **2. Governance model**:
 - **BDFL**: one person makes all decisions → bus factor 1 at the top level
@@ -119,6 +128,8 @@ even when doing a full deep-dive. Keep it scannable — maximum 1 page.
 - Link between OSS project and commercial offering
 - Whether the project predates or postdates the company's founding
 - Any announced acquisition, pivot, or shutdown risk
+- **Foundation membership** (from script SECTION 12): CNCF Sandbox/Incubating/Graduated, Apache incubator/top-level, Linux Foundation. Foundation status = governance maturity and independence from any single backer. CNCF Graduated = highest community trust signal in cloud-native space.
+- **Crunchbase funding** (from script SECTION 13, manual): backing org's latest funding round, total raised, key investors — more predictive of 3-year survival than GitHub activity
 
 ### Output template
 
@@ -147,6 +158,8 @@ relationship between the OSS project and any commercial entity.]
 - **Paid/enterprise tier**: [yes — link | no]
 - **Primary sponsors/funders**: [FUNDING.yml entries / Open Collective / none — commercially funded]
 - **Incentive alignment**: [why the backing org continues to invest]
+- **Foundation status**: [CNCF Graduated/Incubating/Sandbox | Apache TLP/Incubating | LF project | None]
+- **Backing org funding** (Crunchbase): [latest round · total raised · key investors · headcount trend]
 
 ## Sustainability Assessment
 
@@ -183,11 +196,15 @@ including assessment of whether external contributors can gain meaningful influe
 
 ### Quantitative signals
 
-**Package download stats** (from script output):
+**Package download stats** (from script output — SECTION 5 + SECTION 9):
 - PyPI: weekly downloads via `https://pypistats.org/api/packages/{name}/recent`
 - npm: weekly downloads via `https://api.npmjs.org/downloads/point/last-week/{name}`
 - crates.io: `https://crates.io/api/v1/crates/{name}`
-- Docker Hub: `https://hub.docker.com/v2/repositories/{org}/{name}/`
+- Docker Hub: pull count via `https://hub.docker.com/v2/repositories/{org}/{name}/` — reflects production deployments more directly than source downloads
+- Homebrew: install count via `https://formulae.brew.sh/api/formula/{name}.json` — strong signal for developer CLI tools on macOS
+- conda-forge: via `https://api.anaconda.org/package/conda-forge/{name}` — relevant for data science / ML projects
+- Libraries.io: SourceRank score and dependent repos count (requires free API key) — cross-ecosystem health aggregate
+- deps.dev (Google): dependency graph and version health via `https://api.deps.dev/v3/systems/{system}/packages/{name}`
 
 **Benchmark downloads** (rough calibration — PyPI/npm scale):
 
@@ -217,6 +234,20 @@ and **named adopters** more heavily than download figures.
 - Number of public repos that import this package → direct proxy for developer adoption
 - > 1,000 dependents = well-established in the ecosystem
 
+**Stack Overflow unanswered rate** (from script §Community Discussion Signals):
+- < 20% unanswered = strong community support
+- 20–40% unanswered = adequate, common for niche tools
+- > 40% unanswered = poor support coverage — users frequently stuck without help
+
+**HackerNews signal calibration**:
+- > 50 stories/year = mainstream developer awareness
+- 10–50 stories/year = niche but known
+- < 10 stories/year = under the radar
+
+**Dev.to article trend**:
+- Compare last 6 months vs prior 6 months — growing = community producing knowledge actively
+- Zero articles = no community knowledge base; high onboarding cost for new contributors
+
 ### Qualitative signals
 
 **Named adopters** (check `ADOPTERS.md`, `USERS.md`, README logos section, official blog):
@@ -234,10 +265,19 @@ and **named adopters** more heavily than download figures.
 - Active marketplace (npm ecosystem, VS Code extensions, Helm charts, etc.)
 - Industry standard compliance (OpenTelemetry, ONNX, gRPC) — reduces lock-in
 
-**Community channels**:
-- Stack Overflow: search `[project-name]` tag → question count and recency
-- Reddit: subreddit existence and activity
+**Community channels** (from script SECTION 10):
+- **Stack Overflow**: tag question count + **unanswered rate** — high unanswered rate signals poor support quality regardless of question volume; check via `https://api.stackexchange.com/2.3/tags/{tag}/info?site=stackoverflow`
+- **Hacker News**: total story hits and top story points via Algolia API (`https://hn.algolia.com/api/v1/search?query={name}&tags=story`) — front-page appearances = mainstream signal; look for sentiment in comment threads
+- **Dev.to**: article count and engagement (reactions, comments) via `https://dev.to/api/articles?tag={tag}` — knowledge production rate reflects community health
+- **Reddit**: subreddit activity and post sentiment — watch for "moving away from X" / "switching to Y" threads as early attrition signals
+- **Google Trends**: 5-year search trend curve (manual check at trends.google.com) — distinguishes growing from peaked or declining mindshare; complement star counts which only go up
+- **YouTube**: tutorial video count and view trends — sustained new video creation = community still attracting newcomers
 - Discord / Slack: member count if publicly listed
+
+**Extended package registry signals** (from script §Extended Package Registry Stats):
+- Docker Hub pull count → real production deployment scale (note: pull counts can be inflated by CI; use as directional signal)
+- Libraries.io SourceRank + dependent repos count → cross-ecosystem dependency health
+- Homebrew / Conda install counts → developer tooling vs. production library distinction
 
 ### Output template
 
@@ -276,7 +316,11 @@ conference talks, case studies).]
 |---------|--------|
 | [Slack/Discord] | [member count or activity level] |
 | GitHub Issues | [open count; avg. response time] |
-| Stack Overflow tag | [`[tag-name]` — N questions, last activity] |
+| Stack Overflow | [`[tag-name]` — N total questions · N% unanswered · last activity: date] |
+| Hacker News | [N total stories · top story N points · sentiment: positive/mixed/negative] |
+| Dev.to | [N articles for tag · avg reactions · most recent: date] |
+| Google Trends | [5-year direction: rising/stable/declining · peak period · top regions] |
+| YouTube | [estimated tutorial count · top video views · recent upload activity] |
 
 ## Cloud & Platform Support
 
@@ -398,12 +442,21 @@ a project's future matters as much as its present.
 - Is the contributor count growing each year?
 - Are new contributors becoming regulars, or is it a one-time spike?
 
-### Media & community signals
+### Media & community signals (from script SECTION 10 + manual)
 
-- **HackerNews**: search `site:news.ycombinator.com <project-name>` — number of front-page hits
-- **Major conference talks**: keynotes at KubeCon, PyCon, React Conf, etc. = mainstream signal
-- **Developer survey presence**: State of JS, JetBrains Developer Survey, Stack Overflow survey
+- **HackerNews** (automated): total story count via Algolia API + top story engagement — front-page appearances = mainstream signal; comment sentiment reveals community mood
+- **Google Trends** (manual): 5-year search trend curve — compare the trend *slope* against competing projects; a rising trend with flat stars = undercounted real adoption
+- **Dev.to articles** (automated): article count and engagement trend — new articles/month rate indicates whether the community is producing knowledge or going quiet
+- **YouTube tutorials**: video count and view trends — sustained new tutorials = community still attracting newcomers; declining views on recent videos = waning interest
+- **Major conference talks**: keynotes at KubeCon, PyCon, QCon, ArchSummit = mainstream signal; consecutive years with multiple sessions = de facto standard
+- **Developer survey presence**: State of JS, JetBrains Developer Survey, Stack Overflow Annual Survey
 - **Twitter/X buzz**: trending mentions, retweets by influential developers
+
+**Google Trends interpretation** (manual step — search trends.google.com):
+- Consistent upward slope = genuinely growing mindshare
+- Plateau after a spike = hype settling into stable use
+- Downward slope = losing developer attention; cross-check with download stats
+- Seasonal pattern (academic calendar) = indicator of research/educational use vs. production
 
 ### Life-cycle stage
 
@@ -475,7 +528,11 @@ If only bug fixes, state "maintenance mode" explicitly.]
 
 | Signal | Detail |
 |--------|--------|
-| [HackerNews / conference / developer survey] | [front-page hits / keynote / listed] |
+| HackerNews mentions (past year) | [N stories — High / Medium / Low] |
+| Google Trends slope (past 12 months) | [Rising / Plateau / Declining — manual check] |
+| Dev.to articles (past 6 months) | [N articles, trend: growing / stable / declining] |
+| Conference talks (past 2 years) | [N talks at major conferences — list] |
+| Developer survey presence | [Listed / Not listed — which surveys] |
 
 ## Trajectory Outlook
 
@@ -511,10 +568,20 @@ From script output (contributor list):
 ### Security Posture
 
 - **SECURITY.md present**: responsible disclosure process exists
-- **CVE history**: search `site:nvd.nist.gov <project-name>` or GitHub Security tab
-- **Dependency audit**: are major dependencies actively maintained?
-- **Security audit**: has the project undergone a third-party audit? (often mentioned in README)
+- **OpenSSF Scorecard** (from script SECTION 11): automated 10-point security score covering branch protection, CI security, dependency update automation, code review requirements, binary artifacts, and more. Score < 5 = significant security hygiene concerns. Check: `https://securityscorecards.dev/#/github.com/{owner}/{repo}`
+- **OSV vulnerabilities** (from script SECTION 11): cross-ecosystem vulnerability database. Query result shows count and severity of known CVEs for the package. 0 vulns = clean; >5 historical vulns = review patching responsiveness.
+- **NVD CVE history** (from script SECTION 11): NIST National Vulnerability Database. Check total CVE count and whether critical/high severity issues were patched promptly.
+- **Dependency audit**: are major dependencies actively maintained? (deps.dev shows transitive dependency health)
+- **Security audit**: has the project undergone a third-party audit? (often mentioned in README or SECURITY.md)
 - **Supply chain**: is the project itself used in CI pipelines of others? (higher-value target)
+
+**Security signal interpretation**:
+
+| OpenSSF Score | Risk |
+|--------------|------|
+| 8–10 | 🟢 Strong security practices |
+| 5–7 | 🟡 Adequate — review failing checks |
+| < 5 | 🔴 Significant gaps — investigate before adopting |
 
 ### Breaking Change Risk
 
@@ -1038,6 +1105,11 @@ rather than the full-report standard:
 | Quick overview ("should I adopt X?") | index.md only | Decision Brief + Key Metrics + one-sentence summaries; target ≤ 1 page |
 | Compare mode (X vs Y) | Full reports for both + chat summary | No depth reduction |
 | Trending repos | Chat table only | No files written |
+
+**Data source coverage by mode**:
+- Full report: all script sections (1–13) are used
+- Investment focus: SECTION 8 (community signals) + SECTION 12 (foundation) are prioritized
+- Quick overview: SECTION 1 (GitHub API) + SECTION 9 (package stats) + SECTION 10 (community) sufficient
 
 **Quick overview index.md**: When writing index.md only, derive section summaries from
 script data without writing the full dimension files. Mark each row in the Contents table

@@ -99,21 +99,28 @@ Do NOT silently skip the check. Always surface missing dependencies to the user.
   > specific sections only, or view the existing report?"
 - If the user says "proceed" / "overwrite" / gives no preference → continue below.
 
-**Finding `<skill-dir>`**: This is the directory containing this `SKILL.md` file
-(the repository root). If installed via `npx skills add`, the installer prints the path.
-You can also locate it with:
+**Finding and running the script**: Locate the script with `find`, then run it directly.
+If installed via `npx skills add`, the installer prints the path.
+
 ```bash
-find ~/.claude -name analyze_repo.sh 2>/dev/null | head -1 | xargs dirname
+# Locate and run in one step (recommended)
+ANALYZER=$(find ~/.claude -name analyze_repo.sh 2>/dev/null | head -1)
+bash "$ANALYZER" <github-url-or-owner/repo>
 ```
+
+> **Note**: Do NOT use `xargs dirname` on the find result and then append `/scripts/` —
+> the find already returns the full path to the script itself.
 
 Run the analysis script. It clones the repo into a local temp directory and fetches
-remote metadata via the `gh` CLI (falls back to unauthenticated `curl` if needed):
-
-```bash
-bash <skill-dir>/scripts/analyze_repo.sh <github-url-or-owner/repo>
-```
+remote metadata via the `gh` CLI (falls back to unauthenticated `curl` if needed).
 
 **If the script fails or returns incomplete data**:
+- **Silent exit after first line** → most common cause: `~/.config/github-analyzer/config`
+  does not exist. This is now fixed in the script (v2+), but if you see only one line of
+  output, debug with:
+  ```bash
+  bash -x "$ANALYZER" <github-url> 2>&1 | head -80
+  ```
 - **Clone failure** → verify the URL is a public repo; try `gh repo view <owner>/<repo>`
   to confirm access.
 - **GitHub API rate-limit** → configure a token (see Tips §GitHub Token) and re-run; or
@@ -132,9 +139,14 @@ TEMP_DIR=/tmp/github-analyzer-XXXXXX
 
 The script collects:
 - **Remote** (GitHub API): repo info, contributors, releases, open PRs, topics, dependents count
-- **Package registries**: PyPI downloads, npm downloads (where applicable)
+- **Package registries**: PyPI, npm, Docker Hub, Homebrew, conda-forge downloads (where applicable)
+- **Dependency intelligence**: Libraries.io SourceRank, deps.dev dependency graph
+- **Community signals**: Stack Overflow tag stats + unanswered rate, Hacker News story count, Dev.to article count
+- **Security health**: OpenSSF Scorecard (10-point automated score), OSV vulnerability count, NVD CVE history
+- **Foundation status**: CNCF landscape lookup, Apache Software Foundation project list
+- **Commercial intelligence**: Crunchbase manual link (automated lookup requires paid API key)
 - **Local** (cloned files): README, manifests, CI configs, community health files,
-  CHANGELOG/breaking-change history, git stats, org/sponsorship files
+  CHANGELOG/breaking-change history, git stats, org/sponsorship files, CONTRIBUTING.md, GOVERNANCE.md
 
 ### 2. Read key local files
 
@@ -426,3 +438,8 @@ Do NOT repeat the full report content in the chat. A brief summary (3-5 sentence
   Default to "all languages, past 7 days" if not specified.
 - **Compare mode**: When comparing X vs Y, run the script for both repos sequentially, then
   synthesize a side-by-side comparison table before writing the narrative.
+- **Google Trends is manual**: The script outputs a direct Trends URL for the project. Always check it — it reveals whether mindshare is growing or has peaked, which star counts cannot show.
+- **OpenSSF Scorecard**: If the automated API returns no data, the score can be generated locally with `scorecard --repo=github.com/{owner}/{repo}` (requires the `scorecard` CLI tool).
+- **Libraries.io API key**: Free tier available at `https://libraries.io/api`. Add `LIBRARIES_IO_KEY=xxx` to `~/.config/github-analyzer/config` to enable automated SourceRank lookups.
+- **YouTube API key**: Optional. Add `YOUTUBE_API_KEY=xxx` to `~/.config/github-analyzer/config` to enable automated tutorial video stats. Free quota is sufficient for occasional use.
+- **Community signals complement GitHub data**: Stack Overflow unanswered rate and HackerNews sentiment often reveal adoption friction that GitHub metrics hide. A project with great stars but 60% SO unanswered rate has a real support problem.

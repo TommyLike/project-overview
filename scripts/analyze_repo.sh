@@ -8,6 +8,9 @@
 
 set -e
 
+# Trap unexpected exits to give a helpful message instead of silent failure
+trap 'echo "" >&2; echo "ERROR: Script exited unexpectedly at line $LINENO. Run with: bash -x $0 $* 2>&1 | head -80" >&2' ERR
+
 INPUT="${1:-}"
 
 if [ -z "$INPUT" ]; then
@@ -57,8 +60,9 @@ _load_config() {
 
 : "${GITHUB_TOKEN:=}"   # initialise to empty if unset
 
-_load_config "$CONFIG_PRIMARY"
-_load_config "$CONFIG_LOCAL"
+# Use || true so set -e doesn't exit when config files are absent
+_load_config "$CONFIG_PRIMARY" || true
+_load_config "$CONFIG_LOCAL" || true
 
 # Validate the token with a lightweight API call; set AUTH_METHOD accordingly
 AUTH_METHOD=""
@@ -380,8 +384,9 @@ echo "### PyPI Download Stats (if Python package)"
 # Derive package name: try repo name, then check setup.py/pyproject.toml
 PYPI_NAME="$REPONAME"
 if [ -f "$REPO_DIR/pyproject.toml" ]; then
-  PYPI_NAME_PARSED=$(grep -E '^name\s*=' "$REPO_DIR/pyproject.toml" 2>/dev/null \
-    | head -1 | sed 's/name\s*=\s*["\x27]//' | sed 's/["\x27].*//' | tr -d ' ' || true)
+  # Match 'name = "..."' in both root scope and under [project] or [tool.poetry]
+  PYPI_NAME_PARSED=$(grep -E '^\s*name\s*=' "$REPO_DIR/pyproject.toml" 2>/dev/null \
+    | head -1 | sed 's/.*name\s*=\s*["\x27]//' | sed 's/["\x27].*//' | tr -d ' ' || true)
   [ -n "$PYPI_NAME_PARSED" ] && PYPI_NAME="$PYPI_NAME_PARSED"
 elif [ -f "$REPO_DIR/setup.py" ]; then
   PYPI_NAME_PARSED=$(grep -E "name\s*=" "$REPO_DIR/setup.py" 2>/dev/null \
@@ -389,7 +394,21 @@ elif [ -f "$REPO_DIR/setup.py" ]; then
   [ -n "$PYPI_NAME_PARSED" ] && PYPI_NAME="$PYPI_NAME_PARSED"
 fi
 
+# Try primary name, then normalized variants (PyPI treats hyphens, underscores, and dots as equivalent)
 PYPI_JSON=$(curl -sf "https://pypistats.org/api/packages/$PYPI_NAME/recent" 2>/dev/null || echo "")
+if ! echo "$PYPI_JSON" | jq -e '.data' &>/dev/null 2>&1; then
+  # Fallback 1: replace underscores with hyphens (most common normalization)
+  PYPI_NAME_ALT=$(echo "$PYPI_NAME" | tr '_' '-')
+  PYPI_JSON=$(curl -sf "https://pypistats.org/api/packages/$PYPI_NAME_ALT/recent" 2>/dev/null || echo "")
+  [ "$(echo "$PYPI_JSON" | jq -e '.data' 2>/dev/null)" != "" ] && PYPI_NAME="$PYPI_NAME_ALT"
+fi
+if ! echo "$PYPI_JSON" | jq -e '.data' &>/dev/null 2>&1; then
+  # Fallback 2: replace hyphens with underscores
+  PYPI_NAME_ALT=$(echo "$PYPI_NAME" | tr '-' '_')
+  PYPI_JSON=$(curl -sf "https://pypistats.org/api/packages/$PYPI_NAME_ALT/recent" 2>/dev/null || echo "")
+  [ "$(echo "$PYPI_JSON" | jq -e '.data' 2>/dev/null)" != "" ] && PYPI_NAME="$PYPI_NAME_ALT"
+fi
+
 if echo "$PYPI_JSON" | jq -e '.data' &>/dev/null 2>&1; then
   echo "Package name: $PYPI_NAME"
   echo "$PYPI_JSON" | jq '{
@@ -758,6 +777,381 @@ echo "--- Recent PR review comments sample (last 5 PRs) ---"
 github_api "repos/$REPO/pulls?state=closed&sort=updated&direction=desc&per_page=5" \
   | jq '[.[] | {number: .number, review_comments: .review_comments, comments: .comments}]' \
   2>/dev/null || echo "(unavailable)"
+echo ""
+
+# ---------------------------------------------------------------
+# SECTION 9: Extended Package Ecosystems
+# ---------------------------------------------------------------
+
+echo "### Extended Package Ecosystems"
+echo ""
+
+echo "#### Docker Hub"
+DOCKER_JSON=$(curl -sf "https://hub.docker.com/v2/repositories/$OWNER/$REPONAME/" 2>/dev/null \
+  || curl -sf "https://hub.docker.com/v2/repositories/library/$REPONAME/" 2>/dev/null \
+  || echo "")
+if echo "$DOCKER_JSON" | jq -e '.pull_count' &>/dev/null 2>&1; then
+  echo "$DOCKER_JSON" | jq '{
+    full_name: .full_name,
+    pull_count: .pull_count,
+    star_count: .star_count,
+    last_updated: .last_updated
+  }' 2>/dev/null
+else
+  echo "(not found on Docker Hub — tried $OWNER/$REPONAME and library/$REPONAME)"
+fi
+echo ""
+
+echo "#### Homebrew"
+BREW_JSON=$(curl -sf "https://formulae.brew.sh/api/formula/$REPONAME.json" 2>/dev/null \
+  || curl -sf "https://formulae.brew.sh/api/cask/$REPONAME.json" 2>/dev/null \
+  || echo "")
+if echo "$BREW_JSON" | jq -e '.name' &>/dev/null 2>&1; then
+  echo "$BREW_JSON" | jq '{
+    name: .name,
+    desc: .desc,
+    analytics_installs_30d: .analytics.install["30d"],
+    analytics_installs_90d: .analytics.install["90d"],
+    analytics_installs_365d: .analytics.install["365d"]
+  }' 2>/dev/null || echo "$BREW_JSON" | jq '{name: .name, desc: .desc}' 2>/dev/null
+else
+  echo "(not found on Homebrew — tried formula and cask for '$REPONAME')"
+fi
+echo ""
+
+echo "#### conda-forge"
+CONDA_JSON=$(curl -sf "https://api.anaconda.org/package/conda-forge/$REPONAME" 2>/dev/null || echo "")
+if echo "$CONDA_JSON" | jq -e '.name' &>/dev/null 2>&1; then
+  echo "$CONDA_JSON" | jq '{
+    name: .name,
+    summary: .summary,
+    downloads: .downloads,
+    last_modified: .modified_at
+  }' 2>/dev/null
+else
+  echo "(not found on conda-forge — tried '$REPONAME')"
+fi
+echo ""
+
+echo "#### Libraries.io (dependency & ecosystem)"
+# Libraries.io provides SourceRank, dependent repos count, and ecosystem info
+# Detect ecosystem from manifest files
+LIBRARIESIO_ECOSYSTEM=""
+[ -f "$REPO_DIR/pyproject.toml" ] || [ -f "$REPO_DIR/setup.py" ] && LIBRARIESIO_ECOSYSTEM="pypi"
+[ -f "$REPO_DIR/package.json" ] && LIBRARIESIO_ECOSYSTEM="npm"
+[ -f "$REPO_DIR/Cargo.toml" ] && LIBRARIESIO_ECOSYSTEM="cargo"
+[ -f "$REPO_DIR/go.mod" ] && LIBRARIESIO_ECOSYSTEM="go"
+[ -f "$REPO_DIR/Gemfile" ] && LIBRARIESIO_ECOSYSTEM="rubygems"
+
+if [ -n "$LIBRARIESIO_ECOSYSTEM" ]; then
+  echo "Detected ecosystem: $LIBRARIESIO_ECOSYSTEM"
+  echo "Manual check URL: https://libraries.io/$LIBRARIESIO_ECOSYSTEM/$REPONAME"
+  echo "(Libraries.io API requires a free key — see https://libraries.io/api for signup)"
+  echo "Key metrics to check manually: SourceRank, Dependent repositories count, Dependent packages count"
+else
+  echo "(could not detect package ecosystem for Libraries.io lookup)"
+fi
+echo ""
+
+echo "#### deps.dev (Google Open Source Insights)"
+# Try to detect package name from manifests
+DEPSDEV_SYSTEM=""
+DEPSDEV_NAME="$REPONAME"
+if [ -f "$REPO_DIR/pyproject.toml" ]; then
+  DEPSDEV_SYSTEM="PYPI"
+  PYPI_NAME_PARSED=$(grep -E '^\s*name\s*=' "$REPO_DIR/pyproject.toml" 2>/dev/null \
+    | head -1 | sed 's/.*name\s*=\s*["\x27]//' | sed 's/["\x27].*//' | tr -d ' ' || true)
+  [ -n "$PYPI_NAME_PARSED" ] && DEPSDEV_NAME="$PYPI_NAME_PARSED"
+elif [ -f "$REPO_DIR/package.json" ]; then
+  DEPSDEV_SYSTEM="NPM"
+  NPM_NAME_PARSED=$(jq -r '.name // empty' "$REPO_DIR/package.json" 2>/dev/null || echo "")
+  [ -n "$NPM_NAME_PARSED" ] && DEPSDEV_NAME="$NPM_NAME_PARSED"
+elif [ -f "$REPO_DIR/go.mod" ]; then
+  DEPSDEV_SYSTEM="GO"
+  GO_MODULE=$(grep '^module ' "$REPO_DIR/go.mod" 2>/dev/null | head -1 | awk '{print $2}' || echo "")
+  [ -n "$GO_MODULE" ] && DEPSDEV_NAME="$GO_MODULE"
+fi
+
+if [ -n "$DEPSDEV_SYSTEM" ]; then
+  DEPSDEV_JSON=$(curl -sf \
+    "https://api.deps.dev/v3/systems/${DEPSDEV_SYSTEM}/packages/${DEPSDEV_NAME}" \
+    2>/dev/null || echo "")
+  if echo "$DEPSDEV_JSON" | jq -e '.packageKey' &>/dev/null 2>&1; then
+    echo "$DEPSDEV_JSON" | jq '{
+      name: .packageKey.name,
+      system: .packageKey.system,
+      versions_count: (.versions | length),
+      latest_version: (.versions | sort_by(.publishedAt) | last | {version: .versionKey.version, published: .publishedAt, is_default: .isDefault})
+    }' 2>/dev/null
+  else
+    echo "(deps.dev returned no data for $DEPSDEV_SYSTEM/$DEPSDEV_NAME)"
+  fi
+  echo "Full dependency graph: https://deps.dev/$DEPSDEV_SYSTEM/$DEPSDEV_NAME"
+else
+  echo "(could not detect package ecosystem for deps.dev lookup)"
+fi
+echo ""
+
+# ---------------------------------------------------------------
+# SECTION 10: Search & Community Signals
+# ---------------------------------------------------------------
+
+echo "### Search & Community Signals"
+echo ""
+
+echo "#### Stack Overflow Tag Stats"
+# Try both the repo name and common variations
+SO_TAG=$(echo "$REPONAME" | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')
+SO_JSON=$(curl -sf \
+  "https://api.stackexchange.com/2.3/tags/$SO_TAG/info?site=stackoverflow" \
+  2>/dev/null || echo "")
+if echo "$SO_JSON" | jq -e '.items[0]' &>/dev/null 2>&1; then
+  echo "$SO_JSON" | jq '.items[0] | {
+    tag: .name,
+    total_questions: .count,
+    has_synonyms: .has_synonyms,
+    is_moderator_only: .is_moderator_only
+  }' 2>/dev/null
+  # Fetch unanswered count for this tag
+  SO_UNANSWERED=$(curl -sf \
+    "https://api.stackexchange.com/2.3/tags/$SO_TAG/info?site=stackoverflow&filter=!nNPvSNQDYW" \
+    2>/dev/null || echo "")
+  echo "$SO_UNANSWERED" | jq '.items[0] | {unanswered_count: .count}' 2>/dev/null || true
+else
+  echo "(tag '$SO_TAG' not found on Stack Overflow)"
+fi
+echo ""
+
+echo "#### Hacker News Mentions (via Algolia)"
+HN_JSON=$(curl -sf \
+  "https://hn.algolia.com/api/v1/search?query=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$REPONAME'))" 2>/dev/null || echo "$REPONAME")&tags=story&hitsPerPage=5" \
+  2>/dev/null || echo "")
+if echo "$HN_JSON" | jq -e '.hits' &>/dev/null 2>&1; then
+  echo "$HN_JSON" | jq '{
+    total_hits: .nbHits,
+    sample_stories: [.hits[:5][] | {
+      title: .title,
+      points: .points,
+      num_comments: .num_comments,
+      created_at: .created_at,
+      url: .story_url
+    }]
+  }' 2>/dev/null
+else
+  echo "(could not fetch HN data)"
+fi
+echo ""
+
+echo "#### Dev.to Articles"
+DEVTO_TAG=$(echo "$REPONAME" | tr '[:upper:]' '[:lower:]' | sed 's/-//g' | sed 's/_//g')
+DEVTO_JSON=$(curl -sf \
+  "https://dev.to/api/articles?tag=$DEVTO_TAG&per_page=5&top=1" \
+  2>/dev/null || echo "")
+if echo "$DEVTO_JSON" | jq -e '.[0]' &>/dev/null 2>&1; then
+  echo "$DEVTO_JSON" | jq '{
+    article_count_in_sample: length,
+    sample: [.[:5][] | {
+      title: .title,
+      published_at: .published_at,
+      positive_reactions_count: .positive_reactions_count,
+      comments_count: .comments_count
+    }]
+  }' 2>/dev/null
+  echo ""
+  echo "Full tag page: https://dev.to/t/$DEVTO_TAG"
+else
+  echo "(no Dev.to articles found for tag '$DEVTO_TAG')"
+fi
+echo ""
+
+echo "#### Google Trends (manual step required)"
+echo "Google Trends has no public API. Check manually:"
+echo "  https://trends.google.com/trends/explore?q=$REPONAME&date=today%205-y"
+echo "Key signals to note: 5-year trend direction (rising/peak/declining), geographic distribution"
+echo ""
+
+# ---------------------------------------------------------------
+# SECTION 11: Security Health
+# ---------------------------------------------------------------
+
+echo "### Security Health"
+echo ""
+
+echo "#### OpenSSF Scorecard"
+SCORECARD_JSON=$(curl -sf \
+  "https://api.securityscorecards.dev/projects/github.com/$REPO" \
+  2>/dev/null || echo "")
+if echo "$SCORECARD_JSON" | jq -e '.score' &>/dev/null 2>&1; then
+  echo "$SCORECARD_JSON" | jq '{
+    score: .score,
+    date: .date,
+    checks: [.checks[] | {name: .name, score: .score, reason: .reason}]
+  }' 2>/dev/null
+else
+  echo "(Scorecard data not available for this repo — may not be indexed yet)"
+  echo "Run locally: scorecard --repo=github.com/$REPO"
+  echo "Or check: https://securityscorecards.dev/#/github.com/$REPO"
+fi
+echo ""
+
+echo "#### OSV Vulnerability Database"
+# Detect ecosystem for OSV query
+OSV_ECOSYSTEM=""
+OSV_NAME="$REPONAME"
+if [ -f "$REPO_DIR/pyproject.toml" ] || [ -f "$REPO_DIR/setup.py" ]; then
+  OSV_ECOSYSTEM="PyPI"
+elif [ -f "$REPO_DIR/package.json" ]; then
+  OSV_ECOSYSTEM="npm"
+  OSV_NAME_PARSED=$(jq -r '.name // empty' "$REPO_DIR/package.json" 2>/dev/null || echo "")
+  [ -n "$OSV_NAME_PARSED" ] && OSV_NAME="$OSV_NAME_PARSED"
+elif [ -f "$REPO_DIR/go.mod" ]; then
+  OSV_ECOSYSTEM="Go"
+elif [ -f "$REPO_DIR/Cargo.toml" ]; then
+  OSV_ECOSYSTEM="crates.io"
+fi
+
+if [ -n "$OSV_ECOSYSTEM" ]; then
+  OSV_RESPONSE=$(curl -sf -X POST "https://api.osv.dev/v1/query" \
+    -H "Content-Type: application/json" \
+    -d "{\"package\": {\"name\": \"$OSV_NAME\", \"ecosystem\": \"$OSV_ECOSYSTEM\"}}" \
+    2>/dev/null || echo "")
+  if echo "$OSV_RESPONSE" | jq -e '.vulns' &>/dev/null 2>&1; then
+    echo "$OSV_RESPONSE" | jq '{
+      total_vulnerabilities: (.vulns | length),
+      vulns: [.vulns[:5][] | {id: .id, summary: .summary, published: .published, severity: (.severity // "N/A")}]
+    }' 2>/dev/null
+  else
+    echo "(no vulnerabilities found in OSV for $OSV_ECOSYSTEM/$OSV_NAME)"
+  fi
+else
+  # Fall back to GitHub advisory query
+  echo "(ecosystem not detected — querying OSV by GitHub repo)"
+  OSV_RESPONSE=$(curl -sf -X POST "https://api.osv.dev/v1/query" \
+    -H "Content-Type: application/json" \
+    -d "{\"package\": {\"name\": \"github.com/$REPO\"}}" \
+    2>/dev/null || echo "")
+  echo "$OSV_RESPONSE" | jq '{total_vulnerabilities: (.vulns | length)}' 2>/dev/null \
+    || echo "(could not query OSV)"
+fi
+echo ""
+
+echo "#### NVD CVE History"
+NVD_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$REPONAME'))" 2>/dev/null || echo "$REPONAME")
+NVD_JSON=$(curl -sf \
+  "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=$NVD_ENCODED&resultsPerPage=5" \
+  2>/dev/null || echo "")
+if echo "$NVD_JSON" | jq -e '.totalResults' &>/dev/null 2>&1; then
+  echo "$NVD_JSON" | jq '{
+    total_cves: .totalResults,
+    sample: [.vulnerabilities[:5][] | {
+      id: .cve.id,
+      published: .cve.published,
+      severity: (.cve.metrics.cvssMetricV31[0].cvssData.baseSeverity // .cve.metrics.cvssMetricV2[0].baseSeverity // "N/A"),
+      description: (.cve.descriptions[] | select(.lang=="en") | .value | if length > 100 then .[:100]+"..." else . end)
+    }]
+  }' 2>/dev/null
+else
+  echo "(could not fetch NVD data)"
+fi
+echo ""
+
+# ---------------------------------------------------------------
+# SECTION 12: Foundation & Governance Status
+# ---------------------------------------------------------------
+
+echo "### Foundation & Governance Status"
+echo ""
+
+echo "#### CNCF Landscape"
+CNCF_LANDSCAPE=$(curl -sf \
+  "https://landscape.cncf.io/api/projects?project=$REPONAME" \
+  2>/dev/null || echo "")
+# Also check via the landscape data directly
+CNCF_DATA=$(curl -sf \
+  "https://raw.githubusercontent.com/cncf/landscape/master/hosted_data/projects.json" \
+  2>/dev/null || echo "")
+if echo "$CNCF_DATA" | jq -e '.' &>/dev/null 2>&1; then
+  CNCF_MATCH=$(echo "$CNCF_DATA" | jq \
+    "[.[] | select(.name | ascii_downcase | contains(\"$(echo $REPONAME | tr '[:upper:]' '[:lower:]')\"))] | .[0]" \
+    2>/dev/null || echo "null")
+  if [ "$CNCF_MATCH" != "null" ] && [ -n "$CNCF_MATCH" ]; then
+    echo "$CNCF_MATCH" | jq '{name: .name, project: .project, category: .category}' 2>/dev/null
+  else
+    echo "(not found in CNCF landscape for '$REPONAME')"
+  fi
+else
+  echo "(could not fetch CNCF landscape data)"
+fi
+echo "Manual check: https://landscape.cncf.io/?selected=$REPONAME"
+echo ""
+
+echo "#### Apache Software Foundation"
+ASF_JSON=$(curl -sf \
+  "https://projects.apache.org/json/foundation/projects.json" \
+  2>/dev/null || echo "")
+if echo "$ASF_JSON" | jq -e '.' &>/dev/null 2>&1; then
+  ASF_MATCH=$(echo "$ASF_JSON" | jq \
+    "[to_entries[] | select(.key | ascii_downcase | contains(\"$(echo $REPONAME | tr '[:upper:]' '[:lower:]')\"))] | .[0]" \
+    2>/dev/null || echo "null")
+  if [ "$ASF_MATCH" != "null" ] && [ -n "$ASF_MATCH" ]; then
+    echo "$ASF_MATCH" | jq '{name: .key, description: .value.description, category: .value.category}' 2>/dev/null
+  else
+    echo "(not found in Apache Software Foundation projects for '$REPONAME')"
+  fi
+else
+  echo "(could not fetch ASF project data)"
+fi
+echo ""
+
+echo "#### Linux Foundation / Other Foundations"
+echo "Manual checks:"
+echo "  Linux Foundation projects: https://www.linuxfoundation.org/projects"
+echo "  OpenSSF projects: https://openssf.org/community/projects/"
+echo "  Eclipse Foundation: https://projects.eclipse.org"
+echo ""
+
+# ---------------------------------------------------------------
+# SECTION 13: Commercial Intelligence
+# ---------------------------------------------------------------
+
+echo "### Commercial Intelligence"
+echo ""
+
+echo "#### Crunchbase (backing org)"
+# No free API for automated Crunchbase data
+# Surface the org info we already have and provide direct link
+echo "Org name    : $OWNER"
+echo "GitHub type : $(echo "$ORG_JSON" | jq -r '.type // "unknown"' 2>/dev/null)"
+echo "GitHub blog : $(echo "$ORG_JSON" | jq -r '.blog // "(none)"' 2>/dev/null)"
+echo ""
+echo "Manual Crunchbase lookup (funding rounds, investors, headcount trend):"
+echo "  https://www.crunchbase.com/organization/$OWNER"
+echo "(Crunchbase requires a paid API key for automated access)"
+echo ""
+
+echo "#### YouTube Content Signals"
+# YouTube Data API requires a key - provide the search URL and note
+echo "Manual check — search for tutorials and talks:"
+echo "  https://www.youtube.com/results?search_query=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$REPONAME tutorial'))" 2>/dev/null || echo "$REPONAME+tutorial")"
+echo "  https://www.youtube.com/results?search_query=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$REPONAME 2024 OR 2025'))" 2>/dev/null || echo "$REPONAME+2024")"
+echo ""
+echo "If YOUTUBE_API_KEY is configured, automated stats can be added."
+echo "Key signals: total video count, view count on top tutorials, recent upload frequency"
+if [ -n "${YOUTUBE_API_KEY:-}" ]; then
+  YT_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$REPONAME'))" 2>/dev/null || echo "$REPONAME")
+  YT_JSON=$(curl -sf \
+    "https://www.googleapis.com/youtube/v3/search?part=snippet&q=$YT_ENCODED&type=video&order=viewCount&maxResults=5&key=$YOUTUBE_API_KEY" \
+    2>/dev/null || echo "")
+  if echo "$YT_JSON" | jq -e '.items' &>/dev/null 2>&1; then
+    echo ""
+    echo "Top YouTube videos by view count:"
+    echo "$YT_JSON" | jq '[.items[:5][] | {
+      title: .snippet.title,
+      channel: .snippet.channelTitle,
+      published: .snippet.publishedAt
+    }]' 2>/dev/null
+  fi
+fi
 echo ""
 
 # ---------------------------------------------------------------
