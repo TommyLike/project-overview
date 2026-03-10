@@ -81,21 +81,22 @@ individually after a failure without re-running the others.
 **Before checking any skills or running any analysis**, ask the user:
 
 ```text
-分析完成后是否需要生成以下格式的报告？（均由中文版 markdown 生成）
+After analysis completes, do you need any of the following output formats?
+(Both are generated from the Chinese Markdown reports.)
 
-  [1] PDF 格式报告（report_zh.pdf）
-  [2] PPT 格式幻灯片（slides_zh.pptx）
-  [3] 两者都需要
-  [4] 都不需要（仅生成 markdown 报告）
+  [1] PDF report (report_zh.pdf)
+  [2] PowerPoint slide deck (slides_zh.pptx)
+  [3] Both
+  [4] Neither — Markdown reports only
 
-请回复编号或直接说明需求。
+Please reply with a number or describe your preference.
 ```
 
 Record the user's answer as **`WANT_PDF`** (true/false) and **`WANT_PPTX`** (true/false).
 These flags control which dependencies to check and which phases to execute.
 
 **Skip this question** if:
-- The user's original request already specified PDF/PPTX (e.g., "生成报告并导出PDF")
+- The user's original request already specified PDF/PPTX (e.g., "generate report and export PDF")
 - The user is re-running a failed Phase 4 or Phase 5 directly
 
 #### Step 0b — Required dependency check
@@ -121,7 +122,7 @@ Install it with:
 Once installed, restart the session and try again.
 ```
 
-**Degraded-mode exception** (user says "proceed anyway / 继续"):
+**Degraded-mode exception** (user says "proceed anyway"):
 - Missing `read-arxiv-paper` → list paper URLs only; add `> ⚠️ read-arxiv-paper skill not installed.`
 - Missing `translate` → English only; add `> ⚠️ translate skill not installed — English only.`
 
@@ -491,22 +492,22 @@ After both `en/` and `zh/` are complete, write the entry-point file:
 
 ---
 
-# {Project Name} — 分析报告
+# {Project Name} — Analysis Report (Chinese)
 
-> {上面英文摘要的中文翻译，一句话}
+> {Chinese translation of the one-sentence verdict above}
 
-📖 [阅读中文版](./zh/index.md)
+📖 [Read in Chinese](./zh/index.md)
 ```
 
 #### After Phase 3 completes
 
 Tell the user:
 ```text
-Markdown 报告已生成：
-  入口：  ./reports/{owner}-{reponame}/introduction.md
-  英文版：./reports/{owner}-{reponame}/en/index.md
-  中文版：./reports/{owner}-{reponame}/zh/index.md
-  缓存：  ./cache/{owner}-{reponame}/
+Markdown reports generated:
+  Entry point:  ./reports/{owner}-{reponame}/introduction.md
+  English:      ./reports/{owner}-{reponame}/en/index.md
+  Chinese:      ./reports/{owner}-{reponame}/zh/index.md
+  Cache:        ./cache/{owner}-{reponame}/
 ```
 
 Then proceed to Phase 4 and/or Phase 5 if the user requested PDF/PPTX.
@@ -546,16 +547,16 @@ are newer than the PDF, ask the user whether to regenerate.
 2. Invoke the `document-skills:pdf` skill with the ordered list of source files and the output path.
 3. On success, confirm to the user:
    ```text
-   ✅ PDF 已生成：./reports/{owner}-{reponame}/report_zh.pdf
+   ✅ PDF generated: ./reports/{owner}-{reponame}/report_zh.pdf
    ```
 4. On failure, tell the user:
    ```text
-   ❌ PDF 生成失败：<error message>
+   ❌ PDF generation failed: <error message>
 
-   排查建议：
-   - 确认 document-skills:pdf skill 已正确安装
-   - 检查源文件是否存在：./reports/{owner}-{reponame}/zh/
-   - 重新运行 Phase 4：直接告诉我"重新生成 PDF"即可，无需重新运行整个分析
+   Troubleshooting:
+   - Confirm the document-skills:pdf skill is correctly installed
+   - Verify source files exist: ./reports/{owner}-{reponame}/zh/
+   - Re-run Phase 4 only: tell me "regenerate PDF" — no need to re-run the full analysis
    ```
 
 ---
@@ -592,16 +593,16 @@ are newer than the PPTX, ask the user whether to regenerate.
    and the output path.
 3. On success, confirm to the user:
    ```text
-   ✅ PPT 已生成：./reports/{owner}-{reponame}/slides_zh.pptx
+   ✅ PPTX generated: ./reports/{owner}-{reponame}/slides_zh.pptx
    ```
 4. On failure, tell the user:
    ```text
-   ❌ PPT 生成失败：<error message>
+   ❌ PPTX generation failed: <error message>
 
-   排查建议：
-   - 确认 document-skills:pptx skill 已正确安装
-   - 检查源文件是否存在：./reports/{owner}-{reponame}/zh/
-   - 重新运行 Phase 5：直接告诉我"重新生成 PPT"即可，无需重新运行整个分析
+   Troubleshooting:
+   - Confirm the document-skills:pptx skill is correctly installed
+   - Verify source files exist: ./reports/{owner}-{reponame}/zh/
+   - Re-run Phase 5 only: tell me "regenerate PPTX" — no need to re-run the full analysis
    ```
 
 ---
@@ -611,20 +612,20 @@ are newer than the PPTX, ask the user whether to regenerate.
 Tell the user a final summary of everything generated:
 
 ```text
-分析报告已全部生成：
+Analysis complete. All requested outputs generated:
 
-  📄 Markdown 报告
-     入口：      ./reports/{owner}-{reponame}/introduction.md
-     英文版：    ./reports/{owner}-{reponame}/en/index.md
-     中文版：    ./reports/{owner}-{reponame}/zh/index.md
+  📄 Markdown reports
+     Entry point:  ./reports/{owner}-{reponame}/introduction.md
+     English:      ./reports/{owner}-{reponame}/en/index.md
+     Chinese:      ./reports/{owner}-{reponame}/zh/index.md
 
-  📑 PDF 报告    ./reports/{owner}-{reponame}/report_zh.pdf       ✅ / ⏭️ 跳过
-  📊 PPT 幻灯片  ./reports/{owner}-{reponame}/slides_zh.pptx      ✅ / ⏭️ 跳过
+  📑 PDF report    ./reports/{owner}-{reponame}/report_zh.pdf       ✅ / ⏭️ skipped
+  📊 PPTX slides   ./reports/{owner}-{reponame}/slides_zh.pptx      ✅ / ⏭️ skipped
 
-  缓存目录：      ./cache/{owner}-{reponame}/
+  Cache:            ./cache/{owner}-{reponame}/
 ```
 
-If a phase failed, show `❌ 失败` and remind the user they can retry that phase alone.
+If a phase failed, show `❌ failed` and remind the user they can retry that phase alone.
 
 ---
 
