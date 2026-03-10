@@ -172,20 +172,23 @@ META="./cache/$OWNER_REPO/meta.json"
 **Run the script**:
 
 ```bash
-ANALYZER=$(find ~/.claude -name analyze_repo.sh 2>/dev/null | head -1)
+ANALYZER=$(find ~/.claude -name analyze_repo.py 2>/dev/null | head -1)
 
 # Normal run (uses cache if fresh):
-bash "$ANALYZER" <github-url-or-owner/repo>
+python "$ANALYZER" <github-url-or-owner/repo>
 
 # Specify custom cache location:
-bash "$ANALYZER" --cache-dir ./cache <github-url>
+python "$ANALYZER" --cache-dir ./cache <github-url>
 
 # Force full re-fetch (ignore all caches):
-bash "$ANALYZER" --force <github-url>
+python "$ANALYZER" --force <github-url>
 
 # Change cache max age (default: 7 days):
-bash "$ANALYZER" --max-age 14 <github-url>
+python "$ANALYZER" --max-age 14 <github-url>
 ```
+
+> **First run**: install dependencies once with `pip install -r scripts/requirements.txt`
+> (requires `requests` and `rich`)
 
 > **Note**: The script saves the repo clone to `./cache/{owner}-{repo}/repo/` — it persists
 > between runs. Do NOT delete this directory manually unless you want a full re-clone.
@@ -213,25 +216,25 @@ FETCHED_AT=2026-03-10T12:00:00Z
 │   ├── github_prs_open.json
 │   ├── github_issues_closed.json
 │   ├── github_dependents.txt
-│   ├── pypi_stats.json
-│   ├── npm_stats.json
+│   ├── pypi_stats.txt
+│   ├── npm_stats.txt
 │   ├── clone_meta.txt
 │   ├── git_stats.txt
 │   ├── contributor_orgs.txt
 │   ├── pr_merge_times.json
 │   ├── good_first_issues.json
-│   ├── docker_stats.json
-│   ├── homebrew_stats.json
-│   ├── conda_stats.json
-│   ├── depsdev.json
-│   ├── stackoverflow.json
+│   ├── docker_stats.txt
+│   ├── homebrew_stats.txt
+│   ├── conda_stats.txt
+│   ├── depsdev.txt
+│   ├── stackoverflow.txt
 │   ├── hackernews.json
 │   ├── devto.json
-│   ├── openssf.json
-│   ├── osv.json
-│   ├── nvd.json
-│   ├── cncf.json
-│   └── asf.json
+│   ├── openssf.txt
+│   ├── osv.txt
+│   ├── nvd.txt
+│   ├── cncf.txt
+│   └── asf.txt
 └── analysis/                    ← Claude's analysis notes (Phase 2 output)
     ├── background.md
     ├── adoption.md
@@ -246,7 +249,8 @@ FETCHED_AT=2026-03-10T12:00:00Z
 - **Auth/rate-limit** → add `GITHUB_TOKEN` to `~/.config/github-analyzer/config`; re-run.
 - **Clone failure** → verify repo is public; try `gh repo view <owner>/<repo>`.
 - **Single section failure** → mark that field `N/A (unavailable — {date})`; continue.
-- **Debug**: `bash -x "$ANALYZER" <url> 2>&1 | head -100`
+- **Debug**: `python "$ANALYZER" <url> --force 2>&1 | head -100`
+- **Missing deps**: `pip install -r scripts/requirements.txt`
 
 **What the script collects** (13 sections, all cached individually):
 
@@ -256,14 +260,14 @@ FETCHED_AT=2026-03-10T12:00:00Z
 | 2 | Org/owner info + funding | `raw/github_org.json` |
 | 3 | Contributors + bus factor | `raw/github_contributors.json` |
 | 4 | Releases, PRs, issues | `raw/github_releases.json` etc. |
-| 5 | PyPI, npm downloads | `raw/pypi_stats.json`, `raw/npm_stats.json` |
+| 5 | PyPI, npm downloads | `raw/pypi_stats.txt`, `raw/npm_stats.txt` |
 | 6 | Local files (README, CHANGELOG, CI) | `repo/` (persistent clone) |
 | 7 | Git stats | `raw/git_stats.txt` |
 | 8 | Community signals (org diversity, PR times, GFI) | `raw/contributor_orgs.txt` etc. |
-| 9 | Docker Hub, Homebrew, conda, deps.dev | `raw/docker_stats.json` etc. |
-| 10 | Stack Overflow, HN, Dev.to, Google Trends | `raw/stackoverflow.json` etc. |
-| 11 | OpenSSF Scorecard, OSV, NVD CVEs | `raw/openssf.json` etc. |
-| 12 | CNCF, Apache Foundation status | `raw/cncf.json`, `raw/asf.json` |
+| 9 | Docker Hub, Homebrew, conda, deps.dev | `raw/docker_stats.txt` etc. |
+| 10 | Stack Overflow, HN, Dev.to, Google Trends | `raw/stackoverflow.txt` etc. |
+| 11 | OpenSSF Scorecard, OSV, NVD CVEs | `raw/openssf.txt` etc. |
+| 12 | CNCF, Apache Foundation status | `raw/cncf.txt`, `raw/asf.txt` |
 | 13 | Crunchbase, YouTube (manual/optional) | (stdout only — manual steps) |
 
 #### 📄 Invoke `read-arxiv-paper` for referenced papers
@@ -335,10 +339,10 @@ fi
 | Section | Raw files to read |
 |---------|------------------|
 | `background.md` | `github_repo.json`, `github_org.json` + local `FUNDING.yml`, `LICENSE`, `CODEOWNERS` |
-| `adoption.md` | `github_dependents.txt`, `pypi_stats.json`, `npm_stats.json`, `docker_stats.json` + local `ADOPTERS.md` |
+| `adoption.md` | `github_dependents.txt`, `pypi_stats.txt`, `npm_stats.txt`, `docker_stats.txt` + local `ADOPTERS.md` |
 | `competitive.md` | `github_repo.json` (topics, description), `stackoverflow.json`, `hackernews.json` + README competitive section |
 | `momentum.md` | `github_releases.json`, `github_prs_open.json`, `github_contributors.json`, `hackernews.json`, `devto.json` |
-| `risk.md` | `github_contributors.json`, `openssf.json`, `osv.json`, `nvd.json` + local `CHANGELOG.md` |
+| `risk.md` | `github_contributors.json`, `openssf.txt`, `osv.txt`, `nvd.txt` + local `CHANGELOG.md` |
 | `technical.md` | `github_repo.json` + local `README.md`, architecture files, `examples/`, `CITATION.cff` |
 | `investment.md` | `contributor_orgs.txt`, `pr_merge_times.json`, `good_first_issues.json` + local `CONTRIBUTING.md`, `GOVERNANCE.md`, `CODEOWNERS` |
 
@@ -633,10 +637,10 @@ If a phase failed, show `❌ 失败` and remind the user they can retry that pha
 - **Normal re-run** (e.g., checking for updates after a week): just run the script again.
   Sections with fresh cache show `[CACHE HIT Nd]` and skip the API call. Stale or new
   sections show `[CACHE MISS]` and re-fetch.
-- **Force full re-fetch**: `bash "$ANALYZER" --force <url>` bypasses all caches.
-- **Change cache age**: `bash "$ANALYZER" --max-age 14 <url>` extends the freshness window
+- **Force full re-fetch**: `python "$ANALYZER" --force <url>` bypasses all caches.
+- **Change cache age**: `python "$ANALYZER" --max-age 14 <url>` extends the freshness window
   to 14 days (useful for stable projects that rarely change).
-- **Custom cache location**: `bash "$ANALYZER" --cache-dir /path/to/cache <url>` — useful
+- **Custom cache location**: `python "$ANALYZER" --cache-dir /path/to/cache <url>` — useful
   for teams sharing a mounted cache directory.
 - **Clear cache for one project**: `rm -rf ./cache/{owner}-{reponame}/`
 - **Clear analysis notes only** (re-analyze with existing raw data):
@@ -647,23 +651,23 @@ If a phase failed, show `❌ 失败` and remind the user they can retry that pha
 ### Authentication
 
 - **GitHub Token (recommended)**: Raises rate limit from 60 to 5,000 req/hr. Token priority:
-  1. `~/.config/github-analyzer/config` (primary)
-  2. `GITHUB_TOKEN` environment variable
-  3. `gh` CLI (if authenticated)
-  4. Unauthenticated (60 req/hr — warns user)
+  1. `GITHUB_TOKEN` environment variable
+  2. `~/.config/github-analyzer/config` (primary config file)
+  3. Local `./config` file next to the script
+  4. `gh` CLI (if authenticated)
+  5. Unauthenticated (60 req/hr — warns user)
 
   **Setup**:
   ```bash
   mkdir -p ~/.config/github-analyzer
-  cat > ~/.config/github-analyzer/config <<'EOF'
-  GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-  LIBRARIES_IO_KEY=xxx   # optional — https://libraries.io/api
-  YOUTUBE_API_KEY=xxx    # optional — for automated tutorial stats
-  EOF
+  # create config file:
+  # GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+  # LIBRARIES_IO_KEY=xxx   # optional — https://libraries.io/api
+  # YOUTUBE_API_KEY=xxx    # optional — for automated tutorial stats
   chmod 600 ~/.config/github-analyzer/config
   ```
-- **No token / no gh CLI**: Falls back to unauthenticated curl. Package registry APIs
-  (PyPI, npm) require no authentication regardless.
+- **No token / no gh CLI**: Falls back to unauthenticated requests. Package registry APIs
+  (PyPI, npm, Docker Hub, etc.) require no authentication regardless.
 
 ### Analysis quality
 
